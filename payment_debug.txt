@@ -1,0 +1,60 @@
+
+[2026-01-12 13:01:52] Request received. User ID: 10019, Amount: 500.00
+User found: 1. Current Status: disabled
+Payment recorded successfully.
+User updated locally. New Billing Date: 2026-02-10
+Connecting to router: 103.61.241.16
+Router secret enabled for 1
+
+[2026-01-12 13:45:15] Request received. User ID: 10019, Invoice ID: , Amount: 500.00
+User found: 1. Current Status: disabled
+New Billing Date: 2026-02-10
+Router connection failed
+
+[2026-01-12 13:49:56] Request received. User ID: 10019, Invoice ID: 4, Amount: 500.00
+User found: 1. Current Status: disabled
+New Billing Date: 2026-02-10
+Router connection failed
+
+[2026-01-12 14:32:42] Request received. User ID: 10019, Invoice ID: 3, Amount: 500.00
+User found: 1. Current Status: enabled
+New Billing Date: 2026-03-10
+Router connection failed
+
+[2026-01-12 14:33:19] Request received. User ID: 10019, Invoice ID: 2, Amount: 500.00
+User found: 1. Current Status: enabled
+New Billing Date: 2026-04-10
+Router connection failed
+
+[2026-01-12 19:11:35] Request received. User ID: 10020, Invoice ID: 5, Amount: 500.00
+User found: 1. Current Status: enabled
+New Billing Date: 2026-02-10
+Router connection failed
+
+[2026-01-12 20:21:20] Request received. User ID: 10016, Invoice ID: 9, Amount: 500.00
+User found: khan3597. Current Status: disabled
+New Billing Date: 2026-02-10
+Router connection failed
+
+[2026-01-12 20:27:59] Request received. User ID: 10016, Invoice ID: 10, Amount: 500.00
+User found: khan3597. Current Status: enabled
+Due Cleared. New Billing Date: 2026-02-10
+Router connection failed
+
+[2026-01-12 21:38:47] Request received. User ID: 10015, Invoice ID: 12, Amount: 500.00
+User found: khan3596. Current Status: disabled
+Payment collected but Due not cleared. Total Due: 500.00. Skipping activation.
+
+[2026-01-12 21:38:56] Request received. User ID: 10015, Invoice ID: 11, Amount: 500.00
+User found: khan3596. Current Status: disabled
+Due Cleared. New Billing Date: 2026-02-10
+Router connection failed
+
+[2026-01-12 21:43:55] Request received. User ID: 10013, Invoice ID: 14, Amount: 500.00
+User found: khan3594. Current Status: disabled
+Payment collected but Due not cleared. Total Due: 500.00. Skipping activation.
+
+[2026-01-12 21:44:03] Request received. User ID: 10013, Invoice ID: 13, Amount: 500.00
+User found: khan3594. Current Status: disabled
+Due Cleared. New Billing Date: 2026-02-10
+Router enabled user khan3594
