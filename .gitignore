@@ -1,0 +1,16 @@
+# Temporary & log files
+*.log
+*.tmp
+*.bak
+
+# Media & temporary scratch files
+media_*.png
+scratch_*.php
+temp_*.php
+extract*.txt
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

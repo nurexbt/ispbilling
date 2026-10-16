@@ -1,0 +1,555 @@
+Array
+(
+    [0] => Array
+        (
+            [.id] => *0
+            [name] => default
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => default
+            [change-tcp-mss] => yes
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => true
+        )
+
+    [1] => Array
+        (
+            [.id] => *1
+            [name] => 1KB
+            [local-address] => 10.100.100.1
+            [remote-address] => KHAN_1KB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [2] => Array
+        (
+            [.id] => *2
+            [name] => 20KB
+            [local-address] => 10.100.101.1
+            [remote-address] => KHAN_20KB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [3] => Array
+        (
+            [.id] => *3
+            [name] => 800KB
+            [local-address] => 10.100.102.1
+            [remote-address] => KHAN_800KB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [4] => Array
+        (
+            [.id] => *4
+            [name] => 1200K
+            [local-address] => 10.100.103.1
+            [remote-address] => KHAN_1200K
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [5] => Array
+        (
+            [.id] => *5
+            [name] => 1MB
+            [local-address] => 10.1.0.1
+            [remote-address] => KHAN_1MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [6] => Array
+        (
+            [.id] => *6
+            [name] => 1.5MB
+            [local-address] => 10.1.1.1
+            [remote-address] => KHAN_1.5MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [7] => Array
+        (
+            [.id] => *7
+            [name] => 2MB
+            [local-address] => 10.1.2.1
+            [remote-address] => KHAN_2MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [8] => Array
+        (
+            [.id] => *8
+            [name] => 2.5MB
+            [local-address] => 10.1.3.1
+            [remote-address] => KHAN_2.5MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [9] => Array
+        (
+            [.id] => *9
+            [name] => 3MB
+            [local-address] => 10.1.4.1
+            [remote-address] => KHAN_3MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [10] => Array
+        (
+            [.id] => *A
+            [name] => 4MB
+            [local-address] => 10.1.8.1
+            [remote-address] => KHAN_4MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [11] => Array
+        (
+            [.id] => *B
+            [name] => 5MB
+            [local-address] => 10.1.12.1
+            [remote-address] => KHAN_5MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [12] => Array
+        (
+            [.id] => *C
+            [name] => 6MB
+            [local-address] => 10.1.14.1
+            [remote-address] => KHAN_6MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [13] => Array
+        (
+            [.id] => *D
+            [name] => 7MB
+            [local-address] => 10.1.15.1
+            [remote-address] => KHAN_7MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [14] => Array
+        (
+            [.id] => *E
+            [name] => 8MB
+            [local-address] => 10.1.16.1
+            [remote-address] => KHAN_8MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [15] => Array
+        (
+            [.id] => *F
+            [name] => 9MB
+            [local-address] => 10.1.17.1
+            [remote-address] => KHAN_9MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [16] => Array
+        (
+            [.id] => *10
+            [name] => 10MB
+            [local-address] => 10.1.18.1
+            [remote-address] => KHAN_10MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [17] => Array
+        (
+            [.id] => *11
+            [name] => 15MB
+            [local-address] => 10.1.19.1
+            [remote-address] => KHAN_15MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [18] => Array
+        (
+            [.id] => *12
+            [name] => 20MB
+            [local-address] => 10.1.20.1
+            [remote-address] => KHAN_20MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => no
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [19] => Array
+        (
+            [.id] => *13
+            [name] => 30MB
+            [local-address] => 10.155.21.1
+            [remote-address] => KHAN_30MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [20] => Array
+        (
+            [.id] => *14
+            [name] => 50MB
+            [local-address] => 10.1.22.1
+            [remote-address] => KHAN_50MB
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => default
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [21] => Array
+        (
+            [.id] => *15
+            [name] => No_Internet
+            [local-address] => 10.200.200.1
+            [remote-address] => No_Internet
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => :foreach dev in
+            [on-down] => 
+            [default] => false
+        )
+
+    [22] => Array
+        (
+            [.id] => *16
+            [name] => Bill_Due_User
+            [local-address] => 10.200.201.1
+            [remote-address] => Bill_Due_User
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [23] => Array
+        (
+            [.id] => *17
+            [name] => Inactive_User
+            [local-address] => 10.250.250.1
+            [remote-address] => Inactive_User
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [24] => Array
+        (
+            [.id] => *18
+            [name] => IP-PHONE
+            [local-address] => 10.50.50.1
+            [remote-address] => KHAN_IP_PHONE
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [25] => Array
+        (
+            [.id] => *19
+            [name] => BDIX-Profile
+            [local-address] => 172.16.31.1
+            [remote-address] => BDIX-POOL
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => yes
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [dns-server] => 8.8.8.8
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [26] => Array
+        (
+            [.id] => *1A
+            [name] => profile1
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => default
+            [only-one] => default
+            [change-tcp-mss] => default
+            [use-upnp] => default
+            [address-list] => 
+            [on-up] => 
+            [on-down] => 
+            [default] => false
+        )
+
+    [27] => Array
+        (
+            [.id] => *FFFFFFFE
+            [name] => default-encryption
+            [bridge-learning] => default
+            [use-mpls] => default
+            [use-compression] => default
+            [use-encryption] => yes
+            [only-one] => default
+            [change-tcp-mss] => yes
+            [use-upnp] => default
+            [address-list] => 
+            [on-up] => 
+            [on-down] => 
+            [default] => true
+        )
+
+)

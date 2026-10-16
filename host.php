@@ -1,454 +1,497 @@
 <?php
-include 'includes/db.php';
-$page_title = 'KHAN ERP - Host Management';
+require_once 'includes/db.php';
+$active_menu = 'host';
+$page_title = 'Devices';
+$page_subtitle = 'Connected syslog sources';
 include 'includes/header.php';
+
+if (!has_permission('host_view')) {
+    echo '<div class="container-fluid p-4"><div class="alert alert-danger shadow-sm border-0"><i class="bi bi-exclamation-triangle-fill me-2"></i> Access Denied. You do not have permission to view devices.</div></div>';
+    echo '</main></div></div></body></html>';
+    exit;
+}
+
+include 'includes/sidebar.php';
+
+// Fetch hosts from DB
+$hosts_query = "SELECT * FROM host_tbl ORDER BY id DESC";
+$hosts_result = $conn->query($hosts_query);
 ?>
 
-<div class="card mb-4" style="background-color: var(--color-lightinfo); border: none; border-radius: 12px;">
-    <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-center">
+<div class="container-fluid pt-2">
+    <!-- Table Card -->
+    <div class="dashboard-card p-0 mt-3 border-0" style="box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);">
+        
+        <!-- Toolbar -->
+        <div class="d-flex justify-content-between align-items-center p-3 border-bottom border-slate-100">
+            <div class="d-flex align-items-center gap-2">
+                <input type="text" class="toolbar-input" placeholder="Search devices...">
+            </div>
             <div>
-                <h5 class="mb-1 fw-bold text-dark" style="font-size: 1.1rem;">Host Service</h5>
-                <div class="small text-muted" style="font-size: 0.8rem;">
-                    <a href="index.php" class="text-decoration-none text-muted">Dashboard</a> 
-                    <span class="mx-1">•</span> 
-                    Host Services
-                </div>
-            </div>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addHostModal" style="border-radius: 6px; font-weight: 500;">
-                <i class="fas fa-plus me-1"></i> Add Host Service
-            </button>
-        </div>
-    </div>
-</div>
-
-<div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-            <input type="text" class="form-control" placeholder="Search..." style="width: 250px;">
-            <div class="d-flex align-items-center">
-                <span class="me-2 text-muted small">Show:</span>
-                <select class="form-select form-select-sm me-2" style="width: 70px;">
-                    <option>10</option>
-                    <option>25</option>
-                    <option>50</option>
-                    <option selected>100</option>
-                    <option>All</option>
-                </select>
-                <span class="me-3 text-muted small">entries</span>
-                <button class="btn btn-outline-secondary btn-sm">Columns <i class="fas fa-chevron-down ms-1"></i></button>
+                <?php if (has_permission('host_add')): ?>
+                <button class="btn-action bg-primary text-white gap-2 px-3 py-2" data-bs-toggle="modal" data-bs-target="#addDeviceModal" style="font-weight: 600;">
+                    <i class="bi bi-plus-lg"></i> Add Device
+                </button>
+                <?php endif; ?>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="bg-light">
+        <!-- Table -->
+        <table id="hostTable" class="table align-middle mb-0" style="width:100%; border-collapse: collapse;">
+            <thead style="background-color: #F8FAFC;">
                     <tr>
-                        <th style="width: 50px;">Actions</th>
-                        <th>ID <i class="fas fa-sort text-muted small ms-1"></i></th>
-                        <th>Name <i class="fas fa-sort text-muted small ms-1"></i></th>
-                        <th>Real Name <i class="fas fa-sort text-muted small ms-1"></i></th>
-                        <th>Host IP <i class="fas fa-sort text-muted small ms-1"></i></th>
-                        <th>API Port <i class="fas fa-sort text-muted small ms-1"></i></th>
-                        <th>Online Status <i class="fas fa-sort text-muted small ms-1"></i></th>
-                        <th>Enabled</th>
+                        <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">#</th>
+                        <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Device Name</th>
+                        <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">IP Address</th>
+                        <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">API Port</th>
+                        <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Username</th>
+                        <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Password</th>
+                        <?php if (has_permission('host_edit') || has_permission('host_delete')): ?>
+<th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Action</th>
+<?php endif; ?>
                     </tr>
                 </thead>
-                <tbody id="routerTableBody">
-                    <?php
-                    // Check if table exists first to avoid error if install.php wasn't run
-                    $checkTable = $conn->query("SHOW TABLES LIKE 'routers'");
-                    if ($checkTable && $checkTable->num_rows > 0) {
-                        $sql = "SELECT * FROM routers ORDER BY id DESC";
-                        $result = $conn->query($sql);
-
-                        if ($result && $result->num_rows > 0) {
-                            while($row = $result->fetch_assoc()) {
-                                echo "<tr>";
-                                echo "<td>
-                                        <div class='dropdown' style='position: static;'>
-                                            <button class='btn btn-sm btn-link text-muted' type='button' data-bs-toggle='dropdown' aria-expanded='false' data-bs-boundary='viewport'>
-                                                <i class='fas fa-ellipsis-h'></i>
-                                            </button>
-                                            <ul class='dropdown-menu dropdown-menu-end shadow border-0' style='border-radius: 8px;'>
-                                                <li><h6 class='dropdown-header fw-bold text-dark'>Actions</h6></li>
-                                                <li><a class='dropdown-item edit-router-btn' href='#' data-id='" . $row['id'] . "'><i class='fas fa-edit text-primary me-2'></i> Edit</a></li>
-                                                <li><a class='dropdown-item delete-router-btn text-danger' href='#' data-id='" . $row['id'] . "'><i class='fas fa-trash-alt me-2'></i> Delete</a></li>
-                                            </ul>
-                                        </div>
-                                      </td>";
-                                echo "<td>" . $row['id'] . "</td>";
-                                echo "<td>" . htmlspecialchars($row['name']) . "</td>";
-                                echo "<td>" . htmlspecialchars($row['name']) . "</td>"; 
-                                echo "<td>" . htmlspecialchars($row['ip_address']) . "</td>";
-                                echo "<td>" . htmlspecialchars($row['api_port']) . "</td>";
-                                echo "<td><span class='badge badge-status bg-secondary router-status' data-id='" . $row['id'] . "'>Checking...</span></td>";
-                                $checked = $row['status'] == 'enabled' ? 'checked' : '';
-                                echo "<td>
-                                        <div class='form-check form-switch'>
-                                            <input class='form-check-input' type='checkbox' $checked>
-                                        </div>
-                                      </td>";
-                                echo "</tr>";
-                            }
-                        } else {
-                            echo "<tr><td colspan='8' class='text-center py-4 text-muted'>No hosts found</td></tr>";
-                        }
-                    } else {
-                         echo "<tr><td colspan='8' class='text-center py-4 text-danger'>Table 'routers' not found. Please run install.php</td></tr>";
-                    }
-                    ?>
+                <tbody style="border-top: 1px solid var(--border-slate-200);">
+                    <?php if ($hosts_result && $hosts_result->num_rows > 0): ?>
+                        <?php $i = 1; while ($row = $hosts_result->fetch_assoc()): ?>
+                        <tr>
+                            <td class="text-slate-500" style="font-size: 11px; padding: 12px 16px;"><?= $i++ ?></td>
+                            <td style="padding: 12px 16px;">
+                                <div class="text-slate-900 mb-1" style="font-size: 12px; font-weight: 500;"><?= htmlspecialchars($row['device_name']) ?></div>
+                                <?php if (isset($row['is_disabled']) && $row['is_disabled'] == 1): ?>
+                                    <div class="status-pill offline device-status" data-id="<?= $row['id'] ?>">Disabled</div>
+                                <?php else: ?>
+                                    <div class="status-pill pending device-status" data-id="<?= $row['id'] ?>">Checking...</div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-slate-600" style="font-size: 11px; padding: 12px 16px;"><?= htmlspecialchars($row['ip_address']) ?></td>
+                            <td class="text-slate-600" style="font-size: 11px; padding: 12px 16px;"><?= htmlspecialchars($row['api_port']) ?></td>
+                            <td class="text-slate-500" style="font-size: 11px; padding: 12px 16px;"><?= htmlspecialchars($row['api_username']) ?></td>
+                            <td class="text-slate-500" style="font-size: 11px; padding: 12px 16px;">
+                                <span class="password-mask">........</span>
+                                <span class="password-real d-none"><?= htmlspecialchars($row['api_password']) ?></span>
+                                <i class="bi bi-eye toggle-password ms-1" style="cursor: pointer;" title="Show Password"></i>
+                            </td>
+                            <?php if (has_permission('host_edit') || has_permission('host_delete')): ?>
+<td style="padding: 12px 16px;">
+                                <div class="d-flex gap-1">
+                                    <?php if (has_permission('host_edit')): ?>
+                                    <button class="btn-action btn-action-green btn-edit-host" style="width: 24px; height: 24px;" title="Edit"
+                                            data-id="<?= $row['id'] ?>"
+                                            data-name="<?= htmlspecialchars($row['device_name']) ?>"
+                                            data-ip="<?= htmlspecialchars($row['ip_address']) ?>"
+                                            data-port="<?= htmlspecialchars($row['api_port']) ?>"
+                                            data-username="<?= htmlspecialchars($row['api_username']) ?>">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (has_permission('host_delete')): ?>
+                                    <button class="btn-action btn-action-red btn-delete-host" style="width: 24px; height: 24px;" title="Delete" data-id="<?= $row['id'] ?>"><i class="bi bi-trash"></i></button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (has_permission('host_edit')): ?>
+                                        <?php if (isset($row['is_disabled']) && $row['is_disabled'] == 1): ?>
+                                            <button class="btn-action btn-action-green btn-toggle-power" style="width: 24px; height: 24px;" title="Enable" data-id="<?= $row['id'] ?>"><i class="bi bi-power"></i></button>
+                                        <?php else: ?>
+                                            <button class="btn-action btn-action-orange btn-toggle-power" style="width: 24px; height: 24px;" title="Disable" data-id="<?= $row['id'] ?>"><i class="bi bi-power"></i></button>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    
+                                    <button class="btn-action btn-action-blue btn-sync-host" style="width: 24px; height: 24px;" title="Check Connection" data-id="<?= $row['id'] ?>"><i class="bi bi-arrow-repeat"></i></button>
+                                </div>
+                            </td>
+<?php endif; ?>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="7" class="text-center text-slate-500 py-4">No devices found. Add your first device!</td>
+                        </tr>
+                    <?php endif; ?>
                 </tbody>
-            </table>
-        </div>
+        </table>
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-body p-3 d-flex justify-content-between align-items-center">
-        <div class="text-muted small">
-            Showing 1 to <?php echo isset($result) ? $result->num_rows : 0; ?> of <?php echo isset($result) ? $result->num_rows : 0; ?> entries
-        </div>
-        <nav aria-label="Page navigation">
-            <ul class="pagination pagination-sm mb-0">
-                <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
-            </ul>
-        </nav>
+<!-- Add Device Modal -->
+<div class="modal fade" id="addDeviceModal" tabindex="-1" aria-labelledby="addDeviceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 600px;">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+      <div class="modal-header border-bottom border-slate-100 py-3 px-4">
+        <h5 class="modal-title text-slate-800 d-flex align-items-center gap-2" id="addDeviceModalLabel" style="font-size: 15px; font-weight: 600;">
+            <div class="bg-primary text-white rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;"><i class="bi bi-router"></i></div> Add Device
+        </h5>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close" style="font-size: 10px;"></button>
+      </div>
+      <div class="modal-body px-4 py-4">
+        <form id="addDeviceForm">
+            <div class="mb-4">
+                <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">Device Name</label>
+                <div class="input-group input-group-sm input-group-rounded">
+                    <span class="input-group-text bg-light border-slate-200 text-primary px-3"><i class="bi bi-tag-fill"></i></span>
+                    <input type="text" name="device_name" class="form-control border-slate-200 shadow-none py-2" placeholder="e.g. Core Router" required>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">IP Address</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-success px-3"><i class="bi bi-hdd-network-fill"></i></span>
+                        <input type="text" name="ip_address" class="form-control border-slate-200 shadow-none py-2" placeholder="160.187.175.26" required>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">API Port</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-warning px-3"><i class="bi bi-plug-fill"></i></span>
+                        <input type="text" name="api_port" class="form-control border-slate-200 shadow-none py-2" placeholder="8728" value="8728" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-2">
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">API Username</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-secondary px-3"><i class="bi bi-person-fill"></i></span>
+                        <input type="text" name="api_username" class="form-control border-slate-200 shadow-none py-2" placeholder="admin" required>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">API Password</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-danger px-3"><i class="bi bi-shield-lock-fill"></i></span>
+                        <input type="password" name="api_password" class="form-control border-slate-200 shadow-none py-2" placeholder="Password" required>
+                    </div>
+                </div>
+            </div>
+      </div>
+      <div class="modal-footer border-top border-slate-100 py-3 px-4 bg-light" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+        <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm px-3" data-bs-dismiss="modal" style="font-size: 12px; font-weight: 500; color: #475569;">Cancel</button>
+        <button type="submit" class="btn btn-sm bg-primary text-white shadow-sm px-3 gap-1 d-flex align-items-center" style="font-size: 12px; font-weight: 500;"><i class="bi bi-check2-circle"></i> Save Device</button>
+      </div>
+        </form>
     </div>
+  </div>
 </div>
 
-<!-- Add Host Modal -->
-<div class="modal fade" id="addHostModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Add New Host</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Edit Device Modal -->
+<div class="modal fade" id="editDeviceModal" tabindex="-1" aria-labelledby="editDeviceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 600px;">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+      <div class="modal-header border-bottom border-slate-100 py-3 px-4">
+        <h5 class="modal-title text-slate-800 d-flex align-items-center gap-2" id="editDeviceModalLabel" style="font-size: 15px; font-weight: 600;">
+            <div class="bg-success text-white rounded d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;"><i class="bi bi-pencil-square"></i></div> Edit Device
+        </h5>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close" style="font-size: 10px;"></button>
+      </div>
+      <div class="modal-body px-4 py-4">
+        <form id="editDeviceForm">
+            <input type="hidden" name="host_id" id="edit_host_id">
+            <div class="mb-4">
+                <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">Device Name</label>
+                <div class="input-group input-group-sm input-group-rounded">
+                    <span class="input-group-text bg-light border-slate-200 text-primary px-3"><i class="bi bi-tag-fill"></i></span>
+                    <input type="text" name="device_name" class="form-control border-slate-200 shadow-none py-2" placeholder="e.g. Core Router" required>
+                </div>
             </div>
-            <div class="modal-body">
-                <form id="addHostForm">
-                    <div class="mb-3">
-                        <label for="deviceName" class="form-label">Device Name / System Identity</label>
-                        <input type="text" class="form-control" id="deviceName" name="deviceName" required>
-                        <div class="form-text">Must match the Mikrotik System Identity exactly.</div>
+            
+            <div class="row mb-4">
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">IP Address</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-success px-3"><i class="bi bi-hdd-network-fill"></i></span>
+                        <input type="text" name="ip_address" class="form-control border-slate-200 shadow-none py-2" placeholder="160.187.175.26" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="hostIp" class="form-label">Host IP Address</label>
-                        <input type="text" class="form-control" id="hostIp" name="hostIp" required>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">API Port</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-warning px-3"><i class="bi bi-plug-fill"></i></span>
+                        <input type="text" name="api_port" class="form-control border-slate-200 shadow-none py-2" placeholder="8728" value="8728" required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="apiPort" class="form-label">API Port</label>
-                            <input type="number" class="form-control" id="apiPort" name="apiPort" value="8728" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="apiUser" class="form-label">API Username</label>
-                            <input type="text" class="form-control" id="apiUser" name="apiUser" required>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="apiPass" class="form-label">API Password</label>
-                        <input type="password" class="form-control" id="apiPass" name="apiPass">
-                    </div>
-                </form>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveHostBtn">
-                    <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
-                    Connect & Save
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Edit Host Modal -->
-<div class="modal fade" id="editHostModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Edit Host</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="row mb-2">
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">API Username</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-secondary px-3"><i class="bi bi-person-fill"></i></span>
+                        <input type="text" name="api_username" class="form-control border-slate-200 shadow-none py-2" placeholder="admin" required>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">API Password</label>
+                    <div class="input-group input-group-sm input-group-rounded">
+                        <span class="input-group-text bg-light border-slate-200 text-danger px-3"><i class="bi bi-shield-lock-fill"></i></span>
+                        <input type="password" name="api_password" class="form-control border-slate-200 shadow-none py-2" placeholder="Leave blank to keep current">
+                    </div>
+                </div>
             </div>
-            <div class="modal-body">
-                <form id="editHostForm">
-                    <input type="hidden" id="editRouterId" name="id">
-                    <div class="mb-3">
-                        <label for="editDeviceName" class="form-label">Device Name / System Identity</label>
-                        <input type="text" class="form-control" id="editDeviceName" name="deviceName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="editHostIp" class="form-label">Host IP Address</label>
-                        <input type="text" class="form-control" id="editHostIp" name="hostIp" required>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editApiPort" class="form-label">API Port</label>
-                            <input type="number" class="form-control" id="editApiPort" name="apiPort" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editApiUser" class="form-label">API Username</label>
-                            <input type="text" class="form-control" id="editApiUser" name="apiUser" required>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="editApiPass" class="form-label">API Password</label>
-                        <input type="password" class="form-control" id="editApiPass" name="apiPass" placeholder="Leave blank to keep current">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="updateHostBtn">
-                    <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
-                    Update & Save
-                </button>
-            </div>
-        </div>
+      </div>
+      <div class="modal-footer border-top border-slate-100 py-3 px-4 bg-light" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+        <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm px-3" data-bs-dismiss="modal" style="font-size: 12px; font-weight: 500; color: #475569;">Cancel</button>
+        <button type="submit" class="btn btn-sm bg-success text-white shadow-sm px-3 gap-1 d-flex align-items-center" style="font-size: 12px; font-weight: 500;"><i class="bi bi-check2-circle"></i> Update Device</button>
+      </div>
+        </form>
     </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteHostModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold text-danger">Delete Host</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to delete this host? This action cannot be undone.</p>
-                <input type="hidden" id="deleteRouterId">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
 <?php include 'includes/footer.php'; ?>
 
 <script>
 $(document).ready(function() {
-    // Check Status for each router
-    $('.router-status').each(function() {
-        const span = $(this);
-        const id = span.data('id');
+    if ($.fn.DataTable.isDataTable('#hostTable')) {
+        $('#hostTable').DataTable().destroy();
+    }
+    
+    var table = $('#hostTable').DataTable();
+    
+    // Bind custom search
+    $('.toolbar-input').on('keyup', function() {
+        table.search(this.value).draw();
+    });
+
+    // Handle Add Device Form Submission
+    $('#addDeviceForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        var $btn = $(this).find('button[type="submit"]');
+        var originalText = $btn.html();
+        $btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+        $btn.prop('disabled', true);
         
         $.ajax({
-            url: 'api/check_status.php',
-            type: 'GET',
-            data: { id: id },
+            url: 'ajax/add_host.php',
+            type: 'POST',
+            data: $(this).serialize(),
             dataType: 'json',
             success: function(response) {
-                if (response.status === 'online') {
-                    span.removeClass('bg-secondary').addClass('bg-success').text('Online');
+                if(response.status === 'success') {
+                    showToast('success', response.message);
+                    $('#addDeviceModal').modal('hide');
+                    $('#addDeviceForm')[0].reset();
+                    setTimeout(function(){ location.reload(); }, 1000); 
                 } else {
-                    span.removeClass('bg-secondary').addClass('bg-danger').text('Offline');
+                    showToast('error', response.message);
                 }
             },
             error: function() {
-                span.removeClass('bg-secondary').addClass('bg-danger').text('Error');
-            }
-        });
-    });
-
-    $('#saveHostBtn').click(function() {
-        const btn = $(this);
-        const spinner = btn.find('.spinner-border');
-        const form = $('#addHostForm');
-        
-        // Basic validation
-        if(!form[0].checkValidity()) {
-            form[0].reportValidity();
-            return;
-        }
-
-        const data = {
-            name: $('#deviceName').val(),
-            ip: $('#hostIp').val(),
-            port: $('#apiPort').val(),
-            user: $('#apiUser').val(),
-            pass: $('#apiPass').val()
-        };
-
-        // UI Loading State
-        btn.prop('disabled', true);
-        spinner.removeClass('d-none');
-        toastr.info('Connecting to Router...', 'Please Wait');
-
-        $.ajax({
-            url: 'api/add_router.php',
-            type: 'POST',
-            data: data,
-            dataType: 'json',
-            success: function(response) {
-                btn.prop('disabled', false);
-                spinner.addClass('d-none');
-
-                if (response.success) {
-                    toastr.success(response.message, 'Success');
-                    $('#addHostModal').modal('hide');
-                    form[0].reset();
-                    // Reload page to show new entry
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    toastr.error(response.message, 'Error');
-                }
+                showToast('error', 'An error occurred while communicating with the server.');
             },
-            error: function(xhr, status, error) {
-                btn.prop('disabled', false);
-                spinner.addClass('d-none');
-                let msg = 'System error occurred.';
-                if (xhr.responseText) {
-                    try {
-                        let json = JSON.parse(xhr.responseText);
-                        if(json.message) msg = json.message;
-                    } catch(e) {}
-                }
-                toastr.error(msg, 'Error');
-                console.error(error);
+            complete: function() {
+                $btn.html(originalText);
+                $btn.prop('disabled', false);
             }
         });
     });
 
     // Handle Edit Button Click
-    $(document).on('click', '.edit-router-btn', function(e) {
+    $('.btn-edit-host').on('click', function() {
+        var id = $(this).data('id');
+        var name = $(this).data('name');
+        var ip = $(this).data('ip');
+        var port = $(this).data('port');
+        var username = $(this).data('username');
+
+        $('#edit_host_id').val(id);
+        $('#editDeviceForm input[name="device_name"]').val(name);
+        $('#editDeviceForm input[name="ip_address"]').val(ip);
+        $('#editDeviceForm input[name="api_port"]').val(port);
+        $('#editDeviceForm input[name="api_username"]').val(username);
+        $('#editDeviceForm input[name="api_password"]').val(''); // Leave blank
+
+        $('#editDeviceModal').modal('show');
+    });
+
+    // Handle Edit Device Form Submission
+    $('#editDeviceForm').on('submit', function(e) {
         e.preventDefault();
-        const id = $(this).data('id');
+        
+        var $btn = $(this).find('button[type="submit"]');
+        var originalText = $btn.html();
+        $btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...');
+        $btn.prop('disabled', true);
         
         $.ajax({
-            url: 'api/get_router.php',
-            type: 'GET',
-            data: { id: id },
+            url: 'ajax/edit_host.php',
+            type: 'POST',
+            data: $(this).serialize(),
             dataType: 'json',
             success: function(response) {
-                if(response.success) {
-                    const data = response.data;
-                    $('#editRouterId').val(data.id);
-                    $('#editDeviceName').val(data.name);
-                    $('#editHostIp').val(data.ip_address);
-                    $('#editApiPort').val(data.api_port);
-                    $('#editApiUser').val(data.username);
-                    $('#editApiPass').val(''); // Clear password field
-                    $('#editHostModal').modal('show');
+                if(response.status === 'success') {
+                    showToast('success', response.message);
+                    $('#editDeviceModal').modal('hide');
+                    setTimeout(function(){ location.reload(); }, 1000); 
                 } else {
-                    toastr.error(response.message, 'Error fetching data');
+                    showToast('error', response.message);
                 }
             },
             error: function() {
-                toastr.error('Failed to fetch router details', 'Error');
+                showToast('error', 'An error occurred while communicating with the server.');
+            },
+            complete: function() {
+                $btn.html(originalText);
+                $btn.prop('disabled', false);
             }
         });
     });
 
-    // Handle Update Button Click
-    $('#updateHostBtn').click(function() {
-        const btn = $(this);
-        const spinner = btn.find('.spinner-border');
-        const form = $('#editHostForm');
-
-        if(!form[0].checkValidity()) {
-            form[0].reportValidity();
-            return;
+    // Toggle password visibility in table
+    $(document).on('click', '.toggle-password', function() {
+        var $td = $(this).closest('td');
+        var $mask = $td.find('.password-mask');
+        var $real = $td.find('.password-real');
+        
+        if ($mask.hasClass('d-none')) {
+            // Currently showing real, switch to mask
+            $mask.removeClass('d-none');
+            $real.addClass('d-none');
+            $(this).removeClass('bi-eye-slash text-primary').addClass('bi-eye');
+            $(this).attr('title', 'Show Password');
+        } else {
+            // Currently showing mask, switch to real
+            $mask.addClass('d-none');
+            $real.removeClass('d-none');
+            $(this).removeClass('bi-eye').addClass('bi-eye-slash text-primary');
+            $(this).attr('title', 'Hide Password');
         }
+    });
 
-        const data = {
-            id: $('#editRouterId').val(),
-            name: $('#editDeviceName').val(),
-            ip: $('#editHostIp').val(),
-            port: $('#editApiPort').val(),
-            user: $('#editApiUser').val(),
-            pass: $('#editApiPass').val()
-        };
-
-        btn.prop('disabled', true);
-        spinner.removeClass('d-none');
-        toastr.info('Updating and Verifying...', 'Please Wait');
-
-        $.ajax({
-            url: 'api/update_router.php',
-            type: 'POST',
-            data: data,
-            dataType: 'json',
-            success: function(response) {
-                btn.prop('disabled', false);
-                spinner.addClass('d-none');
-
-                if (response.success) {
-                    toastr.success(response.message, 'Success');
-                    $('#editHostModal').modal('hide');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    toastr.error(response.message, 'Error');
-                }
+    // Delete Host
+    $(document).on('click', '.btn-delete-host', function() {
+        var id = $(this).data('id');
+        
+        Swal.fire({
+            title: 'Delete Device?',
+            text: "You won't be able to revert this!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+            customClass: {
+                popup: 'compact-swal-popup',
+                title: 'compact-swal-title',
+                htmlContainer: 'compact-swal-text',
+                actions: 'compact-swal-actions',
+                confirmButton: 'btn btn-sm btn-danger px-4',
+                cancelButton: 'btn btn-sm btn-secondary px-3 text-white'
             },
-            error: function(xhr) {
-                btn.prop('disabled', false);
-                spinner.addClass('d-none');
-                let msg = 'System error occurred.';
-                try {
-                    let json = JSON.parse(xhr.responseText);
-                    if(json.message) msg = json.message;
-                } catch(e) {}
-                toastr.error(msg, 'Error');
+            buttonsStyling: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: 'ajax/delete_host.php',
+                    type: 'POST',
+                    data: { host_id: id },
+                    dataType: 'json',
+                    success: function(response) {
+                        if(response.status === 'success') {
+                            showToast('success', response.message);
+                            setTimeout(function(){ location.reload(); }, 800);
+                        } else {
+                            showToast('error', response.message);
+                        }
+                    },
+                    error: function() {
+                        showToast('error', 'An error occurred while deleting.');
+                    }
+                });
             }
         });
     });
 
-    // Handle Delete Button Click
-    $(document).on('click', '.delete-router-btn', function(e) {
-        e.preventDefault();
-        const id = $(this).data('id');
-        $('#deleteRouterId').val(id);
-        $('#deleteHostModal').modal('show');
-    });
-
-    // Confirm Delete
-    $('#confirmDeleteBtn').click(function() {
-        const id = $('#deleteRouterId').val();
-        const btn = $(this);
+    // Toggle Power Status
+    $(document).on('click', '.btn-toggle-power', function() {
+        var id = $(this).data('id');
+        var $btn = $(this);
+        var $icon = $btn.find('i');
         
-        btn.prop('disabled', true);
+        $btn.prop('disabled', true);
+        $icon.removeClass('bi-power').addClass('spinner-border spinner-border-sm');
         
         $.ajax({
-            url: 'api/delete_router.php',
+            url: 'ajax/toggle_host_status.php',
             type: 'POST',
-            data: { id: id },
+            data: { host_id: id },
             dataType: 'json',
             success: function(response) {
-                if (response.success) {
-                    toastr.success(response.message, 'Deleted');
-                    $('#deleteHostModal').modal('hide');
-                    setTimeout(() => location.reload(), 1000);
+                if(response.status === 'success') {
+                    showToast('success', response.message);
+                    setTimeout(function(){ location.reload(); }, 800);
                 } else {
-                    toastr.error(response.message, 'Error');
-                    btn.prop('disabled', false);
+                    showToast('error', response.message);
+                    $btn.prop('disabled', false);
+                    $icon.removeClass('spinner-border spinner-border-sm').addClass('bi-power');
                 }
             },
             error: function() {
-                toastr.error('Failed to delete', 'Error');
-                btn.prop('disabled', false);
+                showToast('error', 'An error occurred.');
+                $btn.prop('disabled', false);
+                $icon.removeClass('spinner-border spinner-border-sm').addClass('bi-power');
             }
         });
     });
 
-    // Fix for Bootstrap 5 dropdowns in responsive tables
-    $('.table-responsive').on('show.bs.dropdown', function () {
-        $(this).css("overflow", "inherit");
+    // Sync Host (Check Connection)
+    $(document).on('click', '.btn-sync-host', function() {
+        var id = $(this).data('id');
+        var $btn = $(this);
+        var $icon = $btn.find('i');
+        var $statusPill = $('.device-status[data-id="'+id+'"]');
+        
+        $btn.prop('disabled', true);
+        $icon.removeClass('bi-arrow-repeat').addClass('spinner-border spinner-border-sm');
+        
+        $.ajax({
+            url: 'ajax/sync_host.php',
+            type: 'POST',
+            data: { host_id: id },
+            dataType: 'json',
+            success: function(response) {
+                if(response.status === 'success') {
+                    $statusPill.removeClass('offline').addClass('online').text('Online');
+                    showToast('success', response.message);
+                } else {
+                    $statusPill.removeClass('online').addClass('offline').text(response.message === 'Device is disabled.' ? 'Disabled' : 'Offline');
+                    showToast('error', response.message);
+                }
+            },
+            error: function() {
+                showToast('error', 'An error occurred while checking connection.');
+            },
+            complete: function() {
+                $btn.prop('disabled', false);
+                $icon.removeClass('spinner-border spinner-border-sm').addClass('bi-arrow-repeat');
+            }
+        });
     });
 
-    $('.table-responsive').on('hide.bs.dropdown', function () {
-        $(this).css("overflow", "auto");
+    // Auto-check connection for active devices on page load
+    $('.device-status.pending').each(function() {
+        var $statusPill = $(this);
+        var id = $statusPill.data('id');
+        
+        $.ajax({
+            url: 'ajax/sync_host.php',
+            type: 'POST',
+            data: { host_id: id },
+            dataType: 'json',
+            success: function(response) {
+                if(response.status === 'success') {
+                    $statusPill.removeClass('pending').addClass('online').text('Online');
+                } else {
+                    $statusPill.removeClass('pending').addClass('offline').text('Offline');
+                }
+            },
+            error: function() {
+                $statusPill.removeClass('pending').addClass('offline').text('Error');
+            }
+        });
     });
 });
 </script>
