@@ -48,6 +48,9 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
                 <?php if (has_permission('customer_add')): ?>
                 <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#importClientModal" style="font-size: 12px; font-weight: 500; color: #475569;"><i class="bi bi-upload"></i> Import CSV</button>
                 <?php endif; ?>
+                <button class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas" style="font-size: 12px; font-weight: 500; color: #475569;">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
             </div>
         </div>
 
@@ -662,6 +665,13 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
 <!-- Hidden Iframe for Printing -->
 <iframe name="../print_frame" id="../print_frame" style="display:none;"></iframe>
 
+<!-- Filter Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="filterOffcanvas" aria-labelledby="filterOffcanvasLabel">
+  <div class="offcanvas-header border-bottom border-slate-100 py-3 px-4">
+    <h5 class="offcanvas-title text-slate-800" id="filterOffcanvasLabel" style="font-size: 15px; font-weight: 600;"><i class="bi bi-funnel text-primary me-2"></i> Filter Customers</h5>
+    <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close" style="font-size: 12px;"></button>
+  </div>
+
 <?php include '../includes/footer.php'; ?>
 
 <script>
@@ -1233,6 +1243,77 @@ $(document).ready(function() {
                 showToast('error', 'Network error.');
             }
         });
+    });
+
+// Track switch interaction for filtering
+    $('.filter-switch-checkbox').on('change', function() {
+        $(this).attr('data-filtered', 'true');
+    });
+
+    // Custom Filters
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex, rowData, counter) {
+        if (settings.nTable.id !== 'customerTable') return true;
+
+        var isBillingFiltered = $('#billingNeuSwitch').attr('data-filtered') === 'true';
+        var filterBilling = isBillingFiltered ? ($('#billingNeuSwitch').is(':checked') ? 'Paid' : 'Unpaid') : '';
+
+        var isRouterFiltered = $('#routerNeuSwitch').attr('data-filtered') === 'true';
+        var filterRouter = isRouterFiltered ? ($('#routerNeuSwitch').is(':checked') ? 'Enabled' : 'Disabled') : '';
+
+        var isNidFiltered = $('#nidNeuSwitch').attr('data-filtered') === 'true';
+        var filterNid = isNidFiltered ? ($('#nidNeuSwitch').is(':checked') ? 'Yes' : 'No') : '';
+
+        var isSpecialFiltered = $('#specialNeuSwitch').attr('data-filtered') === 'true';
+        var filterSpecial = isSpecialFiltered ? ($('#specialNeuSwitch').is(':checked') ? 'Yes' : 'No') : '';
+
+        var filterDateFrom = $('#filterDateFrom').val();
+        var filterDateTo = $('#filterDateTo').val();
+
+        var clientNodeHtml = settings.aoData[dataIndex].anCells[1].innerHTML || '';
+        var contactNodeText = settings.aoData[dataIndex].anCells[2].innerText || '';
+        var statusNodeText = settings.aoData[dataIndex].anCells[7].innerText || '';
+        var datesNodeText = settings.aoData[dataIndex].anCells[5].innerText || '';
+
+        if (filterNid) {
+            var hasNid = contactNodeText.indexOf('NID:') !== -1;
+            if (filterNid === 'Yes' && hasNid) return false;
+            if (filterNid === 'No' && !hasNid) return false;
+        }
+
+        if (filterSpecial) {
+            var hasSpecial = clientNodeHtml.indexOf('Special User') !== -1;
+            if (filterSpecial === 'Yes' && !hasSpecial) return false;
+            if (filterSpecial === 'No' && hasSpecial) return false;
+        }
+
+        if (filterBilling && statusNodeText.indexOf(filterBilling) === -1) return false;
+        if (filterRouter && statusNodeText.indexOf(filterRouter) === -1) return false;
+
+        if (filterDateFrom || filterDateTo) {
+            var cycleMatch = datesNodeText.match(/Bill:\s*(\d{4}-\d{2}-\d{2})/);
+            if (cycleMatch && cycleMatch[1]) {
+                var cycleDate = new Date(cycleMatch[1]);
+                if (filterDateFrom && cycleDate < new Date(filterDateFrom)) return false;
+                if (filterDateTo && cycleDate > new Date(filterDateTo)) return false;
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    $('#applyFilterBtn').on('click', function() {
+        table.draw();
+        var offcanvasElement = document.getElementById('filterOffcanvas');
+        var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (offcanvas) offcanvas.hide();
+    });
+
+    $('#resetFilterBtn').on('click', function() {
+        $('#customerFilterForm')[0].reset();
+        $('.filter-switch-checkbox').attr('data-filtered', 'false');
+        table.draw();
     });
 
 });

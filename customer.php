@@ -120,6 +120,9 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
                 <?php if (has_permission('customer_add')): ?>
                 <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#importClientModal" style="font-size: 12px; font-weight: 500; color: #475569;"><i class="bi bi-upload"></i> Import CSV</button>
                 <?php endif; ?>
+                <button class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas" style="font-size: 12px; font-weight: 500; color: #475569;">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
             </div>
         </div>
 
@@ -1193,6 +1196,196 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
 <!-- Hidden Iframe for Printing -->
 <iframe name="print_frame" id="print_frame" style="display:none;"></iframe>
 
+<!-- Filter Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="filterOffcanvas" aria-labelledby="filterOffcanvasLabel">
+  <div class="offcanvas-header border-bottom border-slate-100 py-3 px-4">
+    <h5 class="offcanvas-title text-slate-800" id="filterOffcanvasLabel" style="font-size: 15px; font-weight: 600;"><i class="bi bi-funnel text-primary me-2"></i> Filter Customers</h5>
+    <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close" style="font-size: 12px;"></button>
+  </div>
+  <div class="offcanvas-body px-4 py-3">
+    <form id="customerFilterForm">
+<style>
+.filter-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    transition: all 0.3s ease;
+    height: 100%;
+}
+.filter-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
+.filter-icon-box {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+.icon-billing { background: #e0f2fe; color: #0284c7; }
+.icon-router { background: #f3e8ff; color: #9333ea; }
+.icon-nid { background: #ffedd5; color: #ea580c; }
+.icon-date { background: #dcfce7; color: #16a34a; }
+
+.simple-switch-checkbox { display: none; }
+.simple-switch-label {
+    display: inline-block;
+    width: 32px;
+    height: 18px;
+    background: #e2e8f0;
+    border-radius: 18px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+.simple-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.simple-switch-checkbox:checked ~ .simple-switch-label {
+    background: #3b82f6;
+}
+.simple-switch-checkbox:checked ~ .simple-switch-label .simple-switch-knob {
+    left: calc(100% - 16px);
+}
+.simple-switch-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+.simple-switch-text {
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    transition: 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex: 1;
+}
+.text-left { text-align: right; }
+.text-right { text-align: left; }
+
+.simple-switch-checkbox:not(:checked) ~ .text-left {
+    color: #0f172a;
+}
+.simple-switch-checkbox:checked ~ .text-right {
+    color: #0f172a;
+}
+</style>
+        <div class="row g-2 mb-3">
+            <!-- Billing filter -->
+            <div class="col-6">
+                <div class="filter-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="filter-icon-box icon-billing"><i class="bi bi-wallet2"></i></div>
+                        <h6 class="m-0 text-slate-700" style="font-size: 11px; font-weight: 700;">Billing</h6>
+                    </div>
+                    <div class="simple-switch-container">
+                        <input type="checkbox" id="billingNeuSwitch" class="simple-switch-checkbox filter-switch-checkbox" data-filtered="false">
+                        <span class="simple-switch-text text-left">Unpaid</span>
+                        <label for="billingNeuSwitch" class="simple-switch-label"><div class="simple-switch-knob"></div></label>
+                        <span class="simple-switch-text text-right">Paid</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Router status -->
+            <div class="col-6">
+                <div class="filter-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="filter-icon-box icon-router"><i class="bi bi-router"></i></div>
+                        <h6 class="m-0 text-slate-700" style="font-size: 11px; font-weight: 700;">Router</h6>
+                    </div>
+                    <div class="simple-switch-container">
+                        <input type="checkbox" id="routerNeuSwitch" class="simple-switch-checkbox filter-switch-checkbox" data-filtered="false">
+                        <span class="simple-switch-text text-left" style="letter-spacing: 0px;">Disable</span>
+                        <label for="routerNeuSwitch" class="simple-switch-label"><div class="simple-switch-knob"></div></label>
+                        <span class="simple-switch-text text-right" style="letter-spacing: 0px;">Enable</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <!-- NID Missing -->
+            <div class="col-6">
+                <div class="filter-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="filter-icon-box icon-nid"><i class="bi bi-person-vcard"></i></div>
+                        <h6 class="m-0 text-slate-700" style="font-size: 11px; font-weight: 700;">NID Missing?</h6>
+                    </div>
+                    <div class="simple-switch-container">
+                        <input type="checkbox" id="nidNeuSwitch" class="simple-switch-checkbox filter-switch-checkbox" data-filtered="false">
+                        <span class="simple-switch-text text-left" style="letter-spacing: 0px;">No</span>
+                        <label for="nidNeuSwitch" class="simple-switch-label"><div class="simple-switch-knob"></div></label>
+                        <span class="simple-switch-text text-right" style="letter-spacing: 0px;">Yes</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Special User -->
+            <div class="col-6">
+                <div class="filter-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="filter-icon-box" style="background: #fef3c7; color: #d97706;"><i class="bi bi-star-fill"></i></div>
+                        <h6 class="m-0 text-slate-700" style="font-size: 11px; font-weight: 700;">Special User</h6>
+                    </div>
+                    <div class="simple-switch-container">
+                        <input type="checkbox" id="specialNeuSwitch" class="simple-switch-checkbox filter-switch-checkbox" data-filtered="false">
+                        <span class="simple-switch-text text-left" style="letter-spacing: 0px;">No</span>
+                        <label for="specialNeuSwitch" class="simple-switch-label"><div class="simple-switch-knob"></div></label>
+                        <span class="simple-switch-text text-right" style="letter-spacing: 0px;">Yes</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expired Date Search -->
+        <div class="row g-2 mb-4">
+            <div class="col-12">
+                <div class="filter-card">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="filter-icon-box icon-date"><i class="bi bi-calendar-event"></i></div>
+                        <h6 class="m-0 text-slate-700" style="font-size: 11px; font-weight: 700;">Billing Expired Date</h6>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="position-relative flex-grow-1">
+                            <label class="position-absolute top-0 start-0 ms-2 bg-white px-1 text-slate-400" style="font-size: 10px; transform: translateY(-50%); z-index: 1;">From</label>
+                            <input type="date" class="form-control form-control-sm border-slate-200 shadow-none py-2 px-2" id="filterDateFrom" style="font-size: 12px; border-radius: 8px;">
+                        </div>
+                        <div class="text-slate-300"><i class="bi bi-arrow-right"></i></div>
+                        <div class="position-relative flex-grow-1">
+                            <label class="position-absolute top-0 start-0 ms-2 bg-white px-1 text-slate-400" style="font-size: 10px; transform: translateY(-50%); z-index: 1;">To</label>
+                            <input type="date" class="form-control form-control-sm border-slate-200 shadow-none py-2 px-2" id="filterDateTo" style="font-size: 12px; border-radius: 8px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+  </div>
+  <div class="offcanvas-footer border-top border-slate-100 py-3 px-4 bg-light d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm w-50" id="resetFilterBtn" style="font-size: 12px; font-weight: 500; color: #475569;">Reset</button>
+      <button type="button" class="btn btn-sm bg-primary text-white shadow-sm w-50" id="applyFilterBtn" style="font-size: 12px; font-weight: 500;">Apply Filters</button>
+  </div>
+</div>
+
 <?php include 'includes/footer.php'; ?>
 
 <script>
@@ -1213,6 +1406,83 @@ $(document).ready(function() {
     // Custom Toolbar Search
     $('#searchCustomer').on('keyup', function() {
         table.search(this.value).draw();
+    });
+
+    // Track switch interaction for filtering
+    $('.filter-switch-checkbox').on('change', function() {
+        $(this).attr('data-filtered', 'true');
+    });
+
+    // Custom Filters
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex, rowData, counter) {
+        if (settings.nTable.id !== 'customerTable') return true;
+
+        var isBillingFiltered = $('#billingNeuSwitch').attr('data-filtered') === 'true';
+        var filterBilling = isBillingFiltered ? ($('#billingNeuSwitch').is(':checked') ? 'Paid' : 'Unpaid') : '';
+
+        var isRouterFiltered = $('#routerNeuSwitch').attr('data-filtered') === 'true';
+        var filterRouter = isRouterFiltered ? ($('#routerNeuSwitch').is(':checked') ? 'Enabled' : 'Disabled') : '';
+
+        var isNidFiltered = $('#nidNeuSwitch').attr('data-filtered') === 'true';
+        var filterNid = isNidFiltered ? ($('#nidNeuSwitch').is(':checked') ? 'Yes' : 'No') : '';
+
+        var isSpecialFiltered = $('#specialNeuSwitch').attr('data-filtered') === 'true';
+        var filterSpecial = isSpecialFiltered ? ($('#specialNeuSwitch').is(':checked') ? 'Yes' : 'No') : '';
+
+        var filterDateFrom = $('#filterDateFrom').val();
+        var filterDateTo = $('#filterDateTo').val();
+
+        var clientNodeHtml = settings.aoData[dataIndex].anCells[1].innerHTML || '';
+        var contactNodeText = settings.aoData[dataIndex].anCells[2].innerText || '';
+        var statusNodeText = settings.aoData[dataIndex].anCells[7].innerText || '';
+        var datesNodeText = settings.aoData[dataIndex].anCells[5].innerText || '';
+
+        // NID Missing Filter
+        if (filterNid) {
+            var hasNid = contactNodeText.indexOf('NID:') !== -1;
+            if (filterNid === 'Yes' && hasNid) return false;
+            if (filterNid === 'No' && !hasNid) return false;
+        }
+
+        // Special User Filter
+        if (filterSpecial) {
+            var hasSpecial = clientNodeHtml.indexOf('Special User') !== -1;
+            if (filterSpecial === 'Yes' && !hasSpecial) return false;
+            if (filterSpecial === 'No' && hasSpecial) return false;
+        }
+
+        // Billing Status Filter
+        if (filterBilling && statusNodeText.indexOf(filterBilling) === -1) return false;
+
+        // Router Status Filter
+        if (filterRouter && statusNodeText.indexOf(filterRouter) === -1) return false;
+
+        // Date Expired Filter
+        if (filterDateFrom || filterDateTo) {
+            var cycleMatch = datesNodeText.match(/Bill:\s*(\d{4}-\d{2}-\d{2})/);
+            if (cycleMatch && cycleMatch[1]) {
+                var cycleDate = new Date(cycleMatch[1]);
+                if (filterDateFrom && cycleDate < new Date(filterDateFrom)) return false;
+                if (filterDateTo && cycleDate > new Date(filterDateTo)) return false;
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    $('#applyFilterBtn').on('click', function() {
+        table.draw();
+        var offcanvasElement = document.getElementById('filterOffcanvas');
+        var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (offcanvas) offcanvas.hide();
+    });
+
+    $('#resetFilterBtn').on('click', function() {
+        $('#customerFilterForm')[0].reset();
+        $('.filter-switch-checkbox').attr('data-filtered', 'false');
+        table.draw();
     });
 
     // Filter Table by Customer Stat Cards
