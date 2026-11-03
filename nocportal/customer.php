@@ -34,9 +34,80 @@ if ($ar_res) { while($r = $ar_res->fetch_assoc()){ $areas_list[] = $r; } }
 $hosts_list = [];
 $host_res = $conn->query("SELECT id, device_name, ip_address FROM host_tbl WHERE is_disabled = 0");
 if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
+
+// Fetch Customers Summary Stats
+$stats_query = "SELECT 
+                    COUNT(*) as total_customers, 
+                    SUM(CASE WHEN (advance_payment - previous_due) >= 0 THEN 1 ELSE 0 END) as paid_customers, 
+                    SUM(CASE WHEN (advance_payment - previous_due) < 0 THEN 1 ELSE 0 END) as unpaid_customers, 
+                    SUM(CASE WHEN pppoe_status = 'disable' THEN 1 ELSE 0 END) as disabled_customers 
+                FROM customer_tbl";
+$stats_result = $conn->query($stats_query);
+$stats = $stats_result ? $stats_result->fetch_assoc() : [];
+$total_clients = intval($stats['total_customers'] ?? 0);
+$paid_clients = intval($stats['paid_customers'] ?? 0);
+$unpaid_clients = intval($stats['unpaid_customers'] ?? 0);
+$disabled_clients = intval($stats['disabled_customers'] ?? 0);
 ?>
 
 <div class="container-fluid pt-2">
+    <!-- Small Information Cards -->
+    <div class="row g-3 mb-2">
+        <!-- Total Client -->
+        <div class="col-6 col-md-3">
+            <div class="dashboard-card p-3 d-flex align-items-center border-0 shadow-sm customer-stat-card" data-filter="" title="Click to view all clients" style="border-left: 4px solid #2563eb !important; border-radius: 12px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); cursor: pointer;">
+                <div class="bg-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3 flex-shrink-0" style="width: 44px; height: 44px;">
+                    <i class="bi bi-people-fill fs-5" style="color: #2563eb;"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <div class="text-slate-500 mb-1 text-truncate" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Total Client</div>
+                    <div class="fw-bold text-truncate" style="font-size: 22px; color: #1e40af; line-height: 1;"><?= number_format($total_clients) ?></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paid Client -->
+        <div class="col-6 col-md-3">
+            <div class="dashboard-card p-3 d-flex align-items-center border-0 shadow-sm customer-stat-card" data-filter="status-paid" title="Click to filter Paid clients" style="border-left: 4px solid #16a34a !important; border-radius: 12px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); cursor: pointer;">
+                <div class="bg-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3 flex-shrink-0" style="width: 44px; height: 44px;">
+                    <i class="bi bi-check-circle-fill fs-5" style="color: #16a34a;"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <div class="text-slate-500 mb-1 text-truncate" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Paid Client</div>
+                    <div class="fw-bold text-truncate" style="font-size: 22px; color: #15803d; line-height: 1;"><?= number_format($paid_clients) ?></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unpaid Client -->
+        <div class="col-6 col-md-3">
+            <div class="dashboard-card p-3 d-flex align-items-center border-0 shadow-sm customer-stat-card" data-filter="status-unpaid" title="Click to filter Unpaid clients" style="border-left: 4px solid #dc2626 !important; border-radius: 12px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); cursor: pointer;">
+                <div class="bg-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3 flex-shrink-0" style="width: 44px; height: 44px;">
+                    <i class="bi bi-exclamation-circle-fill fs-5" style="color: #dc2626;"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <div class="text-slate-500 mb-1 text-truncate" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Unpaid Client</div>
+                    <div class="fw-bold text-truncate" style="font-size: 22px; color: #b91c1c; line-height: 1;"><?= number_format($unpaid_clients) ?></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disabled Customer (pppoe deactivated) -->
+        <div class="col-6 col-md-3">
+            <div class="dashboard-card p-3 d-flex align-items-center border-0 shadow-sm customer-stat-card" data-filter="pppoe-disabled" title="Click to filter Disabled (PPPoE Deactivated) clients" style="border-left: 4px solid #d97706 !important; border-radius: 12px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); cursor: pointer;">
+                <div class="bg-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3 flex-shrink-0" style="width: 44px; height: 44px;">
+                    <i class="bi bi-person-x-fill fs-5" style="color: #d97706;"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <div class="text-slate-500 mb-1 text-truncate" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Disabled Customer</div>
+                    <div class="d-flex align-items-baseline gap-1.5 flex-wrap">
+                        <span class="fw-bold text-truncate" style="font-size: 22px; color: #b45309; line-height: 1;"><?= number_format($disabled_clients) ?></span>
+                        <span style="font-size: 10px; color: #92400e; font-weight: 500;">(PPPoE Deactivated)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Customers Card -->
     <div class="dashboard-card p-0 mt-3 border-0" style="box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);">
         
@@ -66,8 +137,8 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
                         <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Dates</th>
                         <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Balance</th>
                         <th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Status</th>
-                        <?php if (has_permission('customer_edit') || has_permission('customer_delete') || has_permission('customer_ledger')): ?>
-<th class="border-0 text-slate-500" style="font-size: 11px; padding: 12px 16px;">Action</th>
+                        <?php if (has_permission('customer_edit') || has_permission('customer_delete') || has_permission('customer_ledger') || has_permission('support_ticket_view')): ?>
+<th class="border-0 text-slate-500 text-center" style="font-size: 11px; padding: 12px 16px; width: 70px;">Action</th>
 <?php endif; ?>
                     </tr>
                 </thead>
@@ -132,7 +203,9 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
                                     $isPaid = $balance >= 0;
                                     $statusClass = $isPaid ? 'bg-success' : 'bg-danger';
                                     $statusText = $isPaid ? 'Paid' : 'Unpaid';
+                                    $pppoeDisabled = ($row['pppoe_status'] ?? '') === 'disable';
                                 ?>
+                                <span class="d-none">status-<?= strtolower($statusText) ?> <?= $pppoeDisabled ? 'pppoe-disabled' : 'pppoe-enabled' ?></span>
                                 <div class="badge <?= $statusClass ?> text-white px-2 py-1" style="font-size: 11px; border-radius: 4px; font-weight: 500;">
                                     <?= $statusText ?>
                                 </div>
@@ -140,15 +213,41 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
                                     <span class="badge bg-light text-slate-400 border border-slate-200" style="font-size: 9px;"><span class="spinner-border spinner-border-sm" style="width: 8px; height: 8px; border-width: 1px;"></span> Router</span>
                                 </div>
                             </td>
-                            <?php if (has_permission('customer_edit') || has_permission('customer_delete') || has_permission('customer_ledger')): ?>
-                            <td style="padding: 12px 16px;">
-                                <div class="d-flex gap-1">
-                                    <?php if (has_permission('customer_ledger')): ?>
-                                    <button type="button" class="btn btn-sm btn-info text-white shadow-sm view-ledger" data-id="<?= $row['id'] ?>" style="font-size: 11px;"><i class="bi bi-wallet2"></i> Ledger</button>
-                                    <?php endif; ?>
-                                    <?php if (has_permission('customer_edit')): ?>
-                                    <button type="button" class="btn btn-sm btn-success text-white shadow-sm edit-customer" data-id="<?= $row['id'] ?>" style="font-size: 11px;"><i class="bi bi-pencil-square"></i></button>
-                                    <?php endif; ?>
+                            <?php if (has_permission('customer_edit') || has_permission('customer_delete') || has_permission('customer_ledger') || has_permission('support_ticket_view')): ?>
+                            <td class="text-center" style="padding: 12px 16px;">
+                                <div class="dropdown d-inline-block">
+                                    <button type="button" 
+                                            class="btn btn-sm customer-action-btn shadow-sm" 
+                                            data-bs-toggle="dropdown" 
+                                            data-bs-display="static"
+                                            aria-expanded="false" 
+                                            title="Customer Actions">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end customer-action-dropdown shadow-lg border-0">
+                                        <?php if (has_permission('customer_ledger')): ?>
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item d-flex align-items-center gap-2 view-ledger" data-id="<?= $row['id'] ?>">
+                                                <i class="bi bi-wallet2 text-primary" style="width: 18px; font-size: 14px; text-align: center;"></i>
+                                                <span>Customer Ledger</span>
+                                            </a>
+                                        </li>
+                                        <?php endif; ?>
+                                        <?php if (has_permission('customer_edit')): ?>
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item d-flex align-items-center gap-2 edit-customer" data-id="<?= $row['id'] ?>">
+                                                <i class="bi bi-pencil-square text-success" style="width: 18px; font-size: 14px; text-align: center;"></i>
+                                                <span>Edit Customer</span>
+                                            </a>
+                                        </li>
+                                        <?php endif; ?>
+                                        <li>
+                                            <a href="javascript:void(0)" class="dropdown-item d-flex align-items-center gap-2 view-tickets" data-id="<?= $row['id'] ?>" data-name="<?= htmlspecialchars($row['name']) ?>" data-username="<?= htmlspecialchars($row['username']) ?>">
+                                                <i class="bi bi-ticket-detailed text-warning" style="width: 18px; font-size: 14px; text-align: center;"></i>
+                                                <span>Ticket</span>
+                                            </a>
+                                        </li>
+                                    </ul>
                                 </div>
                             </td>
                             <?php endif; ?>
@@ -358,6 +457,90 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
     border-radius: 10px !important;
     font-size: 13px !important;
     font-weight: 500;
+}
+/* Stylish Iconic Action Button & Dropdown Modal System */
+.customer-action-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    color: #475569;
+    font-size: 14px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.customer-action-btn:hover,
+.customer-action-btn:focus,
+.customer-action-btn[aria-expanded="true"] {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #2563eb;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15) !important;
+}
+.customer-action-btn:active {
+    transform: scale(0.95);
+}
+
+.customer-action-dropdown {
+    min-width: 170px !important;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+    overflow: hidden;
+    z-index: 1060 !important;
+    padding: 6px !important;
+    margin-top: 6px !important;
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    left: auto !important;
+    animation: dropdownFadeIn 0.12s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.customer-action-dropdown .dropdown-item {
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+.customer-action-dropdown .dropdown-item:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+.customer-action-dropdown .dropdown-item:active {
+    background-color: #e2e8f0;
+}
+
+/* Small Information Card Styles */
+.customer-stat-card {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    position: relative;
+}
+.customer-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04) !important;
+}
+.customer-stat-card.active-filter {
+    box-shadow: 0 0 0 2px #0f172a, 0 10px 15px -3px rgba(0, 0, 0, 0.12) !important;
+    transform: translateY(-2px);
 }
 </style>
 
@@ -735,6 +918,124 @@ if ($host_res) { while($r = $host_res->fetch_assoc()){ $hosts_list[] = $r; } }
   </div>
 </div>
 
+<!-- Customer Ticket & Notes Modal -->
+<div class="modal fade" id="customerTicketModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="max-width: 850px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+      <div class="modal-header border-bottom border-slate-100 py-3 px-4 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff;">
+        <div class="d-flex align-items-center gap-2">
+            <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; font-size: 15px;">
+                <i class="bi bi-ticket-detailed"></i>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold text-white m-0" style="font-size: 15px; line-height: 1.2;">Customer Tickets & Notes</h5>
+                <div class="text-slate-300 small" style="font-size: 11px;">
+                    <span id="ctmCustomerName" class="fw-semibold text-warning"></span> 
+                    <span id="ctmCustomerUsername" class="badge bg-white/20 text-white ms-1 px-2 py-0.5" style="background: rgba(255,255,255,0.15);"></span>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-warning fw-semibold shadow-sm px-3 d-flex align-items-center gap-1" id="ctmNewTicketToggleBtn" style="font-size: 12px; border-radius: 6px;">
+                <i class="bi bi-plus-lg"></i> <span>New Ticket</span>
+            </button>
+            <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close" style="font-size: 12px;"></button>
+        </div>
+      </div>
+      
+      <div class="modal-body p-3 bg-slate-50" style="min-height: 420px; max-height: calc(85vh - 120px); overflow-y: auto;">
+          
+          <!-- Add / Edit Ticket Form Card (Hidden by default, shown on toggle or edit) -->
+          <div class="card border-0 shadow-sm mb-3" id="ctmTicketFormCard" style="display: none; border-radius: 10px; border-left: 4px solid #f59e0b !important;">
+              <div class="card-header bg-white py-2 px-3 d-flex justify-content-between align-items-center border-bottom border-slate-100">
+                  <h6 class="m-0 fw-bold text-slate-800" id="ctmFormHeading" style="font-size: 13px;">
+                      <i class="bi bi-plus-circle text-warning me-1"></i> Create Support Ticket
+                  </h6>
+                  <button type="button" class="btn-close shadow-none" id="ctmCancelFormBtn" aria-label="Close" style="font-size: 10px;"></button>
+              </div>
+              <div class="card-body p-3 bg-white">
+                  <form id="ctmTicketForm">
+                      <input type="hidden" name="ticket_id" id="ctmTicketId" value="0">
+                      <input type="hidden" name="customer_id" id="ctmCustomerId" value="0">
+                      
+                      <div class="row g-2 mb-2">
+                          <div class="col-md-7">
+                              <label class="form-label text-slate-600 mb-1" style="font-size: 11px; font-weight: 600;">Title / Subject <span class="text-danger">*</span></label>
+                              <input type="text" name="title" id="ctmTicketTitle" class="form-control form-control-sm border-slate-200" placeholder="e.g. Optical wire issue / Low speed / Router config" required style="font-size: 12px;">
+                          </div>
+                          <div class="col-md-5">
+                              <label class="form-label text-slate-600 mb-1" style="font-size: 11px; font-weight: 600;">Category</label>
+                              <select name="category_id" id="ctmTicketCategory" class="form-select form-select-sm border-slate-200" style="font-size: 12px;">
+                                  <option value="">General Issue</option>
+                              </select>
+                          </div>
+                      </div>
+                      
+                      <div class="row g-2 mb-2">
+                          <div class="col-md-6">
+                              <label class="form-label text-slate-600 mb-1" style="font-size: 11px; font-weight: 600;">Priority</label>
+                              <select name="priority" id="ctmTicketPriority" class="form-select form-select-sm border-slate-200" style="font-size: 12px;">
+                                  <option value="Low">Low</option>
+                                  <option value="Medium" selected>Medium</option>
+                                  <option value="High">High</option>
+                                  <option value="Urgent">Urgent</option>
+                              </select>
+                          </div>
+                          <div class="col-md-6">
+                              <label class="form-label text-slate-600 mb-1" style="font-size: 11px; font-weight: 600;">Status</label>
+                              <select name="status" id="ctmTicketStatus" class="form-select form-select-sm border-slate-200" style="font-size: 12px;">
+                                  <option value="Pending" selected>Pending</option>
+                                  <option value="In Progress">In Progress</option>
+                                  <option value="Review">Review</option>
+                                  <option value="Completed">Completed</option>
+                                  <option value="Cancelled">Cancelled</option>
+                              </select>
+                          </div>
+                      </div>
+                      
+                      <div class="mb-2">
+                          <label class="form-label text-slate-600 mb-1" style="font-size: 11px; font-weight: 600;">Description / Notes <span class="text-danger">*</span></label>
+                          <textarea name="description" id="ctmTicketDescription" rows="3" class="form-control form-control-sm border-slate-200" placeholder="Enter problem details, client complaint, or visit notes..." required style="font-size: 12px;"></textarea>
+                      </div>
+
+                      <div class="d-flex justify-content-end gap-2 mt-3 pt-2 border-top border-slate-100">
+                          <button type="button" class="btn btn-sm btn-light border-slate-200 text-slate-600 px-3" id="ctmFormCancelBtn" style="font-size: 12px;">Cancel</button>
+                          <button type="submit" class="btn btn-sm btn-primary px-3 shadow-sm d-flex align-items-center gap-1" id="ctmSubmitBtn" style="font-size: 12px;">
+                              <i class="bi bi-check2-circle"></i> <span id="ctmSubmitBtnText">Save Ticket</span>
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+
+          <!-- Tickets List Container -->
+          <div id="ctmTicketsListContainer">
+              <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                  <span class="text-slate-600 fw-semibold" style="font-size: 12px;"><i class="bi bi-card-checklist text-primary me-1"></i> Customer Ticket History</span>
+                  <span class="badge bg-white text-slate-600 border border-slate-200 px-2 py-1" id="ctmTicketCountBadge" style="font-size: 11px;">0 Tickets</span>
+              </div>
+              <div id="ctmTicketsLoading" class="text-center py-5">
+                  <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                  <div class="text-slate-400 small mt-2" style="font-size: 12px;">Loading tickets & notes...</div>
+              </div>
+              <div id="ctmTicketsEmpty" class="text-center py-5 bg-white rounded-3 border border-slate-200 p-4" style="display: none;">
+                  <div class="text-slate-300 mb-2"><i class="bi bi-ticket-detailed" style="font-size: 38px;"></i></div>
+                  <h6 class="text-slate-600 fw-semibold mb-1" style="font-size: 13px;">No Support Tickets Found</h6>
+                  <p class="text-slate-400 mb-3" style="font-size: 11px;">This customer doesn't have any tickets or notes yet.</p>
+                  <button type="button" class="btn btn-sm btn-warning px-3 shadow-sm" id="ctmEmptyNewBtn" style="font-size: 12px;">
+                      <i class="bi bi-plus-lg me-1"></i> Create First Ticket
+                  </button>
+              </div>
+              <div id="ctmTicketsCards" class="d-flex flex-column gap-2">
+                  <!-- Rendered dynamically via JS -->
+              </div>
+          </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Hidden Iframe for Printing -->
 <iframe name="print_frame" id="print_frame" style="display:none;"></iframe>
 
@@ -949,6 +1250,19 @@ $(document).ready(function() {
     // Custom Toolbar Search
     $('#searchCustomer').on('keyup', function() {
         table.search(this.value).draw();
+    });
+
+    // Filter Table by Customer Stat Cards
+    $(document).on('click', '.customer-stat-card', function() {
+        var filterVal = $(this).data('filter');
+        if ($(this).hasClass('active-filter') || !filterVal) {
+            $('.customer-stat-card').removeClass('active-filter');
+            table.column(7).search('').draw();
+        } else {
+            $('.customer-stat-card').removeClass('active-filter');
+            $(this).addClass('active-filter');
+            table.column(7).search(filterVal).draw();
+        }
     });
 
     // Track switch interaction for filtering
@@ -1621,6 +1935,383 @@ $(document).ready(function() {
             error: function() {
                 btn.prop('disabled', false).html('<i class="bi bi-save"></i> Save Changes');
                 showToast('error', 'Network error.');
+            }
+        });
+    });
+
+    // ================= CUSTOMER TICKETS & NOTES MODAL SYSTEM =================
+    const TICKET_AJAX_PATH = '../ajax/';
+    let currentTicketCustomerId = 0;
+    let customerTicketCategories = [];
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return $('<div>').text(str).html();
+    }
+
+    function escapeAttr(str) {
+        if (!str) return '';
+        return String(str).replace(/"/g, '&quot;');
+    }
+
+    function getStatusBadge(status) {
+        let cls = 'bg-secondary text-white';
+        if (status === 'Pending') cls = 'bg-secondary text-white';
+        else if (status === 'In Progress') cls = 'bg-primary text-white';
+        else if (status === 'Review') cls = 'bg-warning text-dark';
+        else if (status === 'Completed') cls = 'bg-success text-white';
+        else if (status === 'Cancelled') cls = 'bg-danger text-white';
+        return `<span class="badge ${cls} fw-semibold" style="font-size: 11px;">${escapeHtml(status)}</span>`;
+    }
+
+    function getPriorityBadge(priority) {
+        let cls = 'bg-success-subtle text-success border border-success-subtle';
+        let icon = 'bi-flag';
+        if (priority === 'Medium') {
+            cls = 'bg-warning-subtle text-warning border border-warning-subtle';
+            icon = 'bi-flag-fill';
+        } else if (priority === 'High') {
+            cls = 'bg-danger-subtle text-danger border border-danger-subtle';
+            icon = 'bi-flag-fill';
+        } else if (priority === 'Urgent') {
+            cls = 'bg-danger text-white';
+            icon = 'bi-exclamation-triangle-fill';
+        }
+        return `<span class="badge ${cls} fw-semibold" style="font-size: 11px;"><i class="bi ${icon} me-1"></i>${escapeHtml(priority)}</span>`;
+    }
+
+    function getStatusBorderColor(status) {
+        if (status === 'In Progress') return '#0284c7';
+        if (status === 'Review') return '#f59e0b';
+        if (status === 'Completed') return '#10b981';
+        if (status === 'Cancelled') return '#ef4444';
+        return '#64748b';
+    }
+
+    function loadCustomerTickets(customerId) {
+        $('#ctmTicketsLoading').show();
+        $('#ctmTicketsEmpty').hide();
+        $('#ctmTicketsCards').empty();
+
+        $.ajax({
+            url: TICKET_AJAX_PATH + 'get_customer_tickets.php',
+            type: 'GET',
+            data: { customer_id: customerId },
+            dataType: 'json',
+            success: function(res) {
+                $('#ctmTicketsLoading').hide();
+                if (res.status === 'success') {
+                    if (res.customer) {
+                        $('#ctmCustomerName').text(res.customer.name || 'Customer');
+                        $('#ctmCustomerUsername').text(res.customer.username ? '@' + res.customer.username : '');
+                    }
+
+                    customerTicketCategories = res.categories || [];
+                    let catSelect = $('#ctmTicketCategory');
+                    catSelect.empty().append('<option value="">General Issue</option>');
+                    customerTicketCategories.forEach(function(c) {
+                        catSelect.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
+                    });
+
+                    const tickets = res.tickets || [];
+                    $('#ctmTicketCountBadge').text(tickets.length + (tickets.length === 1 ? ' Ticket' : ' Tickets'));
+
+                    if (tickets.length === 0) {
+                        $('#ctmTicketsEmpty').show();
+                    } else {
+                        tickets.forEach(function(t) {
+                            const borderCol = getStatusBorderColor(t.status);
+                            const statusBadge = getStatusBadge(t.status);
+                            const priorityBadge = getPriorityBadge(t.priority);
+                            const categoryBadge = t.category_name 
+                                ? `<span class="badge bg-light text-slate-700 border border-slate-200" style="font-size: 10px;"><i class="bi bi-tag-fill text-slate-400 me-1"></i>${escapeHtml(t.category_name)}</span>` 
+                                : '';
+                            const replyCount = parseInt(t.reply_count || 0);
+
+                            const cardHtml = `
+                                <div class="card border-0 shadow-sm rounded-3 ticket-card-item mb-2.5" data-ticket-id="${t.id}" style="border-left: 4px solid ${borderCol} !important; background: #ffffff;">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                            <div>
+                                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                                    <span class="badge fw-bold font-monospace" style="font-size: 11px; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;">#${String(t.id).padStart(4, '0')}</span>
+                                                    <span class="fw-bold text-slate-800" style="font-size: 13px;">${escapeHtml(t.title)}</span>
+                                                    ${categoryBadge}
+                                                </div>
+                                                <div class="text-slate-400 mt-1" style="font-size: 11px;">
+                                                    <i class="bi bi-clock me-1"></i>${escapeHtml(t.created_at_formatted || t.created_at)} 
+                                                    ${t.created_by ? `<span class="ms-1">&bull; by <span class="text-slate-600 fw-medium">${escapeHtml(t.created_by)}</span></span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                                ${statusBadge}
+                                                ${priorityBadge}
+                                            </div>
+                                        </div>
+
+                                        <div class="text-slate-600 bg-slate-50 p-2.5 rounded-2 border border-slate-100 mb-2" style="font-size: 12px; line-height: 1.5; white-space: pre-line;">${escapeHtml(t.description || '').replace(/\\n/g, '<br>')}</div>
+
+                                        <div class="d-flex justify-content-between align-items-center pt-2 border-top border-slate-100 mt-2">
+                                            <button type="button" class="btn btn-sm btn-light border-slate-200 text-slate-600 px-2.5 py-1 ctm-toggle-replies-btn" data-ticket-id="${t.id}" style="font-size: 11px;">
+                                                <i class="bi bi-chat-left-dots text-primary me-1"></i>
+                                                <span class="reply-count-text">${replyCount} Note${replyCount === 1 ? '' : 's'}</span>
+                                                <i class="bi bi-chevron-down ms-1" style="font-size: 9px;"></i>
+                                            </button>
+                                            <div class="d-flex align-items-center gap-1.5">
+                                                <button type="button" class="btn btn-sm btn-outline-primary px-2.5 py-1 ctm-edit-ticket-btn" 
+                                                    data-id="${t.id}" 
+                                                    data-title="${escapeAttr(t.title)}" 
+                                                    data-category-id="${t.category_id || ''}" 
+                                                    data-priority="${t.priority}" 
+                                                    data-status="${t.status}" 
+                                                    data-description="${escapeAttr(t.description)}" 
+                                                    style="font-size: 11px;">
+                                                    <i class="bi bi-pencil-square me-1"></i> Edit Ticket
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="ctm-replies-section mt-3 pt-2 border-top border-slate-200" id="ctmRepliesSection-${t.id}" style="display: none;">
+                                            <div class="ctm-replies-content mb-3" id="ctmRepliesContent-${t.id}">
+                                                <div class="text-center py-2 text-slate-400 small"><span class="spinner-border spinner-border-sm"></span> Loading history...</div>
+                                            </div>
+                                            <div class="bg-light p-2.5 rounded-2 border border-slate-200">
+                                                <label class="form-label text-slate-700 fw-semibold mb-1" style="font-size: 11px;"><i class="bi bi-chat-dots-fill text-primary me-1"></i> Add Progress Note / Quick Update</label>
+                                                <div class="d-flex gap-2">
+                                                    <input type="text" class="form-control form-control-sm border-slate-200 ctm-quick-note-input" placeholder="Type a note or progress update..." style="font-size: 12px;">
+                                                    <button type="button" class="btn btn-sm btn-primary px-3 flex-shrink-0 ctm-send-note-btn" data-ticket-id="${t.id}" data-status="${t.status}" data-priority="${t.priority}" style="font-size: 12px;">
+                                                        <i class="bi bi-send-fill me-1"></i> Send
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            $('#ctmTicketsCards').append(cardHtml);
+                        });
+                    }
+                } else {
+                    showToast('error', res.message || 'Failed to load tickets.');
+                }
+            },
+            error: function() {
+                $('#ctmTicketsLoading').hide();
+                showToast('error', 'Network error while loading tickets.');
+            }
+        });
+    }
+
+    // Open Customer Ticket Modal on Action click
+    $(document).on('click', '.view-tickets', function() {
+        currentTicketCustomerId = $(this).data('id');
+        const custName = $(this).data('name') || '';
+        const custUsername = $(this).data('username') || '';
+
+        $('#ctmCustomerId').val(currentTicketCustomerId);
+        $('#ctmCustomerName').text(custName);
+        $('#ctmCustomerUsername').text(custUsername ? '@' + custUsername : '');
+
+        resetTicketForm();
+        $('#ctmTicketFormCard').hide();
+        $('#ctmNewTicketToggleBtn').html('<i class="bi bi-plus-lg"></i> <span>New Ticket</span>');
+
+        $('#customerTicketModal').modal('show');
+        loadCustomerTickets(currentTicketCustomerId);
+    });
+
+    function resetTicketForm() {
+        $('#ctmTicketId').val('0');
+        $('#ctmTicketTitle').val('');
+        $('#ctmTicketCategory').val('');
+        $('#ctmTicketPriority').val('Medium');
+        $('#ctmTicketStatus').val('Pending');
+        $('#ctmTicketDescription').val('');
+        $('#ctmFormHeading').html('<i class="bi bi-plus-circle text-warning me-1"></i> Create Support Ticket');
+        $('#ctmSubmitBtnText').text('Save Ticket');
+    }
+
+    // Toggle Form with "+ New Ticket"
+    $('#ctmNewTicketToggleBtn, #ctmEmptyNewBtn').on('click', function() {
+        if ($('#ctmTicketFormCard').is(':visible') && $('#ctmTicketId').val() === '0') {
+            $('#ctmTicketFormCard').slideUp(200);
+            $('#ctmNewTicketToggleBtn').html('<i class="bi bi-plus-lg"></i> <span>New Ticket</span>');
+        } else {
+            resetTicketForm();
+            $('#ctmTicketFormCard').slideDown(200);
+            $('#ctmNewTicketToggleBtn').html('<i class="bi bi-x-lg"></i> <span>Close Form</span>');
+            $('#ctmTicketTitle').focus();
+        }
+    });
+
+    // Cancel Form
+    $('#ctmCancelFormBtn, #ctmFormCancelBtn').on('click', function() {
+        $('#ctmTicketFormCard').slideUp(200);
+        $('#ctmNewTicketToggleBtn').html('<i class="bi bi-plus-lg"></i> <span>New Ticket</span>');
+        resetTicketForm();
+    });
+
+    // Click Edit Ticket on Card
+    $(document).on('click', '.ctm-edit-ticket-btn', function() {
+        const id = $(this).data('id');
+        const title = $(this).data('title');
+        const categoryId = $(this).data('category-id');
+        const priority = $(this).data('priority');
+        const status = $(this).data('status');
+        const description = $(this).data('description');
+
+        $('#ctmTicketId').val(id);
+        $('#ctmTicketTitle').val(title);
+        $('#ctmTicketCategory').val(categoryId);
+        $('#ctmTicketPriority').val(priority);
+        $('#ctmTicketStatus').val(status);
+        $('#ctmTicketDescription').val(description);
+
+        $('#ctmFormHeading').html(`<i class="bi bi-pencil-square text-primary me-1"></i> Edit Ticket #${String(id).padStart(4, '0')}`);
+        $('#ctmSubmitBtnText').text('Update Ticket');
+
+        $('#ctmTicketFormCard').slideDown(200);
+        $('#ctmNewTicketToggleBtn').html('<i class="bi bi-x-lg"></i> <span>Close Form</span>');
+
+        $('#customerTicketModal .modal-body').animate({ scrollTop: 0 }, 250);
+        $('#ctmTicketTitle').focus();
+    });
+
+    // Submit Ticket Form (Add or Edit)
+    $('#ctmTicketForm').on('submit', function(e) {
+        e.preventDefault();
+        const ticketId = parseInt($('#ctmTicketId').val() || 0);
+        const submitBtn = $('#ctmSubmitBtn');
+        const originalText = $('#ctmSubmitBtnText').text();
+
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
+
+        const endpoint = ticketId > 0 ? (TICKET_AJAX_PATH + 'update_ticket.php') : (TICKET_AJAX_PATH + 'add_ticket.php');
+
+        $.ajax({
+            url: endpoint,
+            type: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function(res) {
+                submitBtn.prop('disabled', false).html('<i class="bi bi-check2-circle"></i> <span id="ctmSubmitBtnText">' + originalText + '</span>');
+                if (res.status === 'success') {
+                    showToast('success', res.message || (ticketId > 0 ? 'Ticket updated successfully' : 'Ticket created successfully'));
+                    $('#ctmTicketFormCard').slideUp(200);
+                    $('#ctmNewTicketToggleBtn').html('<i class="bi bi-plus-lg"></i> <span>New Ticket</span>');
+                    resetTicketForm();
+                    loadCustomerTickets(currentTicketCustomerId);
+                } else {
+                    showToast('error', res.message || 'Operation failed');
+                }
+            },
+            error: function() {
+                submitBtn.prop('disabled', false).html('<i class="bi bi-check2-circle"></i> <span id="ctmSubmitBtnText">' + originalText + '</span>');
+                showToast('error', 'Network error while saving ticket.');
+            }
+        });
+    });
+
+    // Toggle Replies & Timeline
+    $(document).on('click', '.ctm-toggle-replies-btn', function() {
+        const ticketId = $(this).data('ticket-id');
+        const section = $(`#ctmRepliesSection-${ticketId}`);
+        const chevron = $(this).find('.bi-chevron-down, .bi-chevron-up');
+
+        if (section.is(':visible')) {
+            section.slideUp(180);
+            chevron.removeClass('bi-chevron-up').addClass('bi-chevron-down');
+        } else {
+            section.slideDown(180);
+            chevron.removeClass('bi-chevron-down').addClass('bi-chevron-up');
+            loadTicketReplies(ticketId);
+        }
+    });
+
+    function loadTicketReplies(ticketId) {
+        const container = $(`#ctmRepliesContent-${ticketId}`);
+        container.html('<div class="text-center py-2 text-slate-400 small"><span class="spinner-border spinner-border-sm"></span> Loading notes...</div>');
+
+        $.ajax({
+            url: TICKET_AJAX_PATH + 'get_ticket_replies.php',
+            type: 'GET',
+            data: { ticket_id: ticketId },
+            dataType: 'json',
+            success: function(res) {
+                if (res.status === 'success') {
+                    const replies = res.data || [];
+                    if (replies.length === 0) {
+                        container.html('<div class="text-slate-400 small py-1 text-center"><i class="bi bi-info-circle me-1"></i> No notes yet.</div>');
+                    } else {
+                        let html = '<div class="d-flex flex-column gap-2">';
+                        replies.forEach(function(r) {
+                            html += `
+                                <div class="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-semibold text-primary" style="font-size: 11px;"><i class="bi bi-person-fill me-1"></i>${escapeHtml(r.created_by)}</span>
+                                        <span class="text-slate-400" style="font-size: 10px;">${escapeHtml(r.created_at)}</span>
+                                    </div>
+                                    <div class="text-slate-700" style="font-size: 12px; line-height: 1.4;">${r.note}</div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        container.html(html);
+                    }
+                } else {
+                    container.html('<div class="text-danger small py-1 text-center">Failed to load notes.</div>');
+                }
+            },
+            error: function() {
+                container.html('<div class="text-danger small py-1 text-center">Network error loading notes.</div>');
+            }
+        });
+    }
+
+    // Submit Quick Progress Note
+    $(document).on('click', '.ctm-send-note-btn', function() {
+        const ticketId = $(this).data('ticket-id');
+        const status = $(this).data('status');
+        const priority = $(this).data('priority');
+        const input = $(this).closest('.d-flex').find('.ctm-quick-note-input');
+        const note = $.trim(input.val());
+        const btn = $(this);
+
+        if (!note) {
+            input.focus();
+            return;
+        }
+
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+        $.ajax({
+            url: TICKET_AJAX_PATH + 'update_ticket.php',
+            type: 'POST',
+            data: {
+                ticket_id: ticketId,
+                status: status,
+                priority: priority,
+                progress_note: note
+            },
+            dataType: 'json',
+            success: function(res) {
+                btn.prop('disabled', false).html('<i class="bi bi-send-fill me-1"></i> Send');
+                if (res.status === 'success') {
+                    input.val('');
+                    showToast('success', 'Note added successfully');
+                    loadTicketReplies(ticketId);
+                    const card = $(`#ctmRepliesSection-${ticketId}`).closest('.ticket-card-item');
+                    const countEl = card.find('.reply-count-text');
+                    const curCount = parseInt(countEl.text()) || 0;
+                    const newCount = curCount + 1;
+                    countEl.text(newCount + (newCount === 1 ? ' Note' : ' Notes'));
+                } else {
+                    showToast('error', res.message || 'Failed to add note');
+                }
+            },
+            error: function() {
+                btn.prop('disabled', false).html('<i class="bi bi-send-fill me-1"></i> Send');
+                showToast('error', 'Network error adding note.');
             }
         });
     });
