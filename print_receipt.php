@@ -38,7 +38,20 @@ if ($res && $res->num_rows > 0) {
     $company = $res->fetch_assoc();
 }
 
-$for_month_formatted = !empty($payment['for_month']) ? date('F Y', strtotime($payment['for_month'] . '-01')) : 'Advance Payment';
+$raw_month = trim($payment['for_month'] ?? '');
+if (empty($raw_month) || strcasecmp($raw_month, 'Advance Payment') === 0) {
+    $for_month_formatted = 'Advance Payment';
+} elseif (strcasecmp($raw_month, 'Previous Due') === 0 || strcasecmp($raw_month, 'previous_due') === 0 || stripos($raw_month, 'previous') !== false) {
+    $for_month_formatted = 'Previous Due';
+} elseif (preg_match('/^\d{4}-\d{2}$/', $raw_month)) {
+    $for_month_formatted = date('F Y', strtotime($raw_month . '-01'));
+} elseif (preg_match('/^[A-Za-z]+-\d{4}$/', $raw_month)) {
+    $for_month_formatted = date('F Y', strtotime('01-' . $raw_month));
+} elseif (($parsed_ts = strtotime($raw_month)) !== false && $parsed_ts > 0 && date('Y', $parsed_ts) > 1970) {
+    $for_month_formatted = date('F Y', $parsed_ts);
+} else {
+    $for_month_formatted = htmlspecialchars($raw_month);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

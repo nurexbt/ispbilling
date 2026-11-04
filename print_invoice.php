@@ -38,7 +38,18 @@ if ($res && $res->num_rows > 0) {
     $company = $res->fetch_assoc();
 }
 
-$billing_month_formatted = date('F Y', strtotime($invoice['billing_month'] . '-01'));
+$raw_billing_month = trim($invoice['billing_month'] ?? '');
+if (preg_match('/^\d{4}-\d{2}$/', $raw_billing_month)) {
+    $billing_month_formatted = date('F Y', strtotime($raw_billing_month . '-01'));
+} elseif (preg_match('/^[A-Za-z]+-\d{4}$/', $raw_billing_month)) {
+    $billing_month_formatted = date('F Y', strtotime('01-' . $raw_billing_month));
+} elseif (!empty($invoice['description'])) {
+    $billing_month_formatted = htmlspecialchars($invoice['description']);
+} elseif (($parsed_ts = strtotime($raw_billing_month)) !== false && $parsed_ts > 0 && date('Y', $parsed_ts) > 1970) {
+    $billing_month_formatted = date('F Y', $parsed_ts);
+} else {
+    $billing_month_formatted = htmlspecialchars($raw_billing_month);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
