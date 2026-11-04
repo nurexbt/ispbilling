@@ -118,6 +118,9 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
                 <?php if (has_permission('customer_add')): ?>
                 <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#importClientModal" style="font-size: 12px; font-weight: 500; color: #475569;"><i class="bi bi-upload"></i> Import CSV</button>
                 <?php endif; ?>
+                <button type="button" id="syncRouterBtn" class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" style="font-size: 12px; font-weight: 500; color: #475569;" title="Sync customer statuses with Mikrotik router">
+                    <i class="bi bi-arrow-repeat text-primary" id="syncRouterIcon"></i> <span id="syncRouterText">Sync Router</span>
+                </button>
                 <button class="btn btn-sm btn-white border-slate-200 shadow-sm d-flex align-items-center gap-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas" style="font-size: 12px; font-weight: 500; color: #475569;">
                     <i class="bi bi-funnel"></i> Filter
                 </button>
@@ -209,8 +212,15 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
                                 <div class="badge <?= $statusClass ?> text-white px-2 py-1" style="font-size: 11px; border-radius: 4px; font-weight: 500;">
                                     <?= $statusText ?>
                                 </div>
+                                <?php 
+                                    $pppoeDisabled = ($row['pppoe_status'] ?? '') === 'disable';
+                                    $routerStatusText = $pppoeDisabled ? 'Disabled' : 'Enabled';
+                                    $routerBadgeClass = $pppoeDisabled ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border border-success border-opacity-25';
+                                ?>
                                 <div class="router-status-badge mt-1" data-username="<?= htmlspecialchars($row['username']) ?>">
-                                    <span class="badge bg-light text-slate-400 border border-slate-200" style="font-size: 9px;"><span class="spinner-border spinner-border-sm" style="width: 8px; height: 8px; border-width: 1px;"></span> Router</span>
+                                    <span class="badge <?= $routerBadgeClass ?>" style="font-size: 10px;">
+                                        <i class="bi bi-router"></i> <?= $routerStatusText ?>
+                                    </span>
                                 </div>
                             </td>
                             <?php if (has_permission('customer_edit') || has_permission('customer_delete') || has_permission('customer_ledger') || has_permission('support_ticket_view')): ?>
@@ -1527,14 +1537,44 @@ $(document).ready(function() {
         });
     }
 
-    $.get('../ajax/get_ppp_status.php', function(res) {
-        if (res.status === 'success') {
-            routerStatuses = res.data;
-            updateRouterBadges();
-        }
+    // On-Demand Router Sync Button Handler
+    $('#syncRouterBtn').on('click', function() {
+        var $btn = $(this);
+        var $icon = $('#syncRouterIcon');
+        var $text = $('#syncRouterText');
+        
+        $btn.prop('disabled', true);
+        $icon.removeClass('bi-arrow-repeat').addClass('spinner-border spinner-border-sm');
+        $text.text('Syncing...');
+        
+        $.ajax({
+            url: '../ajax/sync_mikrotik_status.php',
+            type: 'POST',
+            dataType: 'json',
+            success: function(res) {
+                $btn.prop('disabled', false);
+                $icon.removeClass('spinner-border spinner-border-sm').addClass('bi-arrow-repeat');
+                $text.text('Sync Router');
+                
+                if (res.status === 'success') {
+                    showToast('success', res.message);
+                    if (res.router_statuses) {
+                        routerStatuses = res.router_statuses;
+                        updateRouterBadges();
+                    }
+                } else {
+                    showToast('error', res.message || 'Failed to sync with router.');
+                }
+            },
+            error: function() {
+                $btn.prop('disabled', false);
+                $icon.removeClass('spinner-border spinner-border-sm').addClass('bi-arrow-repeat');
+                $text.text('Sync Router');
+                showToast('error', 'Network error while connecting to router sync service.');
+            }
+        });
     });
-
-    table.on('draw', function() {
+table.on('draw', function() {
         if (Object.keys(routerStatuses).length > 0) {
             updateRouterBadges();
         }

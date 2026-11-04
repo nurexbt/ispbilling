@@ -188,11 +188,14 @@ while ($row = $result->fetch_assoc()) {
     // Col 6: Balance
     $col6 = '<div class="' . $balanceClass . '" style="font-size:12px;">' . $balanceFmt . '</div>';
 
+    $routerStatusText = $pppoeDisabled ? 'Disabled' : 'Enabled';
+    $routerBadgeClass = $pppoeDisabled ? 'bg-danger bg-opacity-10 text-danger border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border-success border-opacity-25';
+
     // Col 7: Status
     $col7 = '<span class="d-none">status-' . strtolower($statusText) . ' ' . ($pppoeDisabled ? 'pppoe-disabled' : 'pppoe-enabled') . '</span>'
           . '<div class="badge ' . $statusClass . ' text-white px-2 py-1" style="font-size:11px;border-radius:4px;font-weight:500;">' . $statusText . '</div>'
           . '<div class="router-status-badge mt-1" data-username="' . htmlspecialchars($row['username']) . '">'
-          . '<span class="badge bg-light text-slate-400 border border-slate-200" style="font-size:9px;"><span class="spinner-border spinner-border-sm" style="width:8px;height:8px;border-width:1px;"></span> Router</span>'
+          . '<span class="badge ' . $routerBadgeClass . ' border" style="font-size:10px;"><i class="bi bi-router"></i> ' . $routerStatusText . '</span>'
           . '</div>';
 
     // Col 8: Action
