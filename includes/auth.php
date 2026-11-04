@@ -60,6 +60,7 @@ function has_permission($permission_key) {
             'billing_full_access',
             'dashboard_view',
             'customer_view', 'customer_add', 'customer_edit', 'customer_delete', 'customer_ledger',
+            'amount_collect_view',
             'expense_view', 'expense_add', 'expense_edit', 'expense_delete',
             'support_ticket_view', 'support_ticket_add', 'support_ticket_update'
         ];
@@ -73,6 +74,7 @@ function has_permission($permission_key) {
             'transmission_full_access',
             'dashboard_view',
             'customer_view', 'customer_add', 'customer_edit', 'customer_delete', 'customer_ledger',
+            'amount_collect_view',
             'expense_view', 'expense_add', 'expense_edit', 'expense_delete',
             'support_ticket_view', 'support_ticket_add', 'support_ticket_update'
         ];
@@ -86,6 +88,7 @@ function has_permission($permission_key) {
             'txbill_full_access',
             'dashboard_view',
             'customer_view', 'customer_add', 'customer_edit', 'customer_delete', 'customer_ledger',
+            'amount_collect_view',
             'expense_view', 'expense_add', 'expense_edit', 'expense_delete',
             'support_ticket_view', 'support_ticket_add', 'support_ticket_update'
         ];
@@ -100,6 +103,7 @@ function has_permission($permission_key) {
             'noc_full_access',
             'dashboard_view',
             'customer_view', 'customer_add', 'customer_edit', 'customer_delete', 'customer_ledger',
+            'amount_collect_view',
             'expense_view', 'expense_add', 'expense_edit', 'expense_delete',
             'support_ticket_view', 'support_ticket_add', 'support_ticket_update',
             'host_view', 'host_add', 'host_edit', 'host_delete',

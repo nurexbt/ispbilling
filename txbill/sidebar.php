@@ -61,6 +61,11 @@ $company_initials = strtoupper(substr($company_name, 0, 2));
                         </a>
                     </li>
                     <li class="nav-item mb-1">
+                        <a href="collect_handover.php" class="nav-link <?php echo (isset($active_menu) && $active_menu == 'collect_handover') ? 'active' : ''; ?>">
+                            <i class="bi bi-cash-coin"></i> <span>Collect and handover</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mb-1">
                         <a href="connection_request.php" class="nav-link <?php echo (isset($active_menu) && $active_menu == 'connection_request') ? 'active' : ''; ?>">
                             <i class="bi bi-diagram-3"></i> <span>Connection Request</span>
                         </a>
