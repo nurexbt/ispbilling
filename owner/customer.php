@@ -490,8 +490,31 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
                     <input type="email" name="email" id="edit_email" class="form-control form-control-sm border-slate-200 shadow-none">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label text-slate-600 mb-1" style="font-size: 12px; font-weight: 500;">ONU MAC/SN</label>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label text-slate-600 mb-0" style="font-size: 12px; font-weight: 500;">ONU MAC/SN</label>
+                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 rounded-pill" id="btnToggleReplaceOnu" style="font-size: 10px; height: 20px; line-height: 18px;" title="Replace ONU from store">
+                            <i class="bi bi-arrow-repeat"></i> Replace
+                        </button>
+                    </div>
                     <input type="text" name="onu_sn" id="edit_onu" class="form-control form-control-sm border-slate-200 shadow-none">
+                    <input type="hidden" name="is_onu_replaced" id="edit_is_onu_replaced" value="0">
+                    <input type="hidden" name="old_onu_sn" id="edit_old_onu_sn" value="">
+
+                    <!-- Replace ONU Section -->
+                    <div id="replaceOnuContainer" class="mt-2 p-2 rounded bg-light border border-primary-subtle d-none">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-primary fw-semibold" style="font-size: 11px;">
+                                <i class="bi bi-box-seam me-1"></i> New ONU (Store)
+                            </span>
+                            <span class="badge bg-white text-secondary border" id="storeOnuCountBadge" style="font-size: 9px;">Checking...</span>
+                        </div>
+                        <select name="new_onu_sn" id="edit_new_onu_sn" class="form-select form-select-sm border-primary shadow-none" style="font-size: 11px;">
+                            <option value="">Select available ONU...</option>
+                        </select>
+                        <div class="text-muted mt-1" style="font-size: 9.5px; line-height: 1.2;">
+                            <i class="bi bi-info-circle text-primary"></i> Current ONU will be marked as replaced, new ONU as delivered, and ticket will be created.
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2298,7 +2321,62 @@ table.on('draw', function() {
         }
     });
 
+    function resetOnuReplaceState() {
+        $('#edit_is_onu_replaced').val('0');
+        $('#edit_old_onu_sn').val('');
+        $('#edit_onu').prop('readonly', false).removeClass('bg-light');
+        $('#btnToggleReplaceOnu').html('<i class="bi bi-arrow-repeat"></i> Replace')
+            .removeClass('btn-outline-danger')
+            .addClass('btn-outline-primary');
+        $('#replaceOnuContainer').addClass('d-none');
+        $('#edit_new_onu_sn').html('<option value="">Select available ONU...</option>');
+    }
+
+    function loadAvailableOnus() {
+        var select = $('#edit_new_onu_sn');
+        select.html('<option value="">Loading available ONUs...</option>').prop('disabled', true);
+        $.get('../ajax/get_available_onus.php', function(res) {
+            select.prop('disabled', false);
+            if (res.status === 'success' && res.data && res.data.length > 0) {
+                var html = '<option value="">-- Select New ONU from Store (' + res.data.length + ' available) --</option>';
+                res.data.forEach(function(item) {
+                    html += '<option value="' + item.barcode_id + '">' + item.item_name + ' (SN: ' + item.barcode_id + ')</option>';
+                });
+                select.html(html);
+                $('#storeOnuCountBadge').text(res.data.length + ' available').removeClass('bg-danger text-white').addClass('bg-white text-success border-success');
+            } else {
+                select.html('<option value="">No available ONUs in store</option>');
+                $('#storeOnuCountBadge').text('0 available').removeClass('bg-white text-success border-success').addClass('bg-danger text-white');
+            }
+        }).fail(function() {
+            select.prop('disabled', false).html('<option value="">Failed to load ONUs</option>');
+            $('#storeOnuCountBadge').text('Error').addClass('bg-danger text-white');
+        });
+    }
+
+    $(document).on('click', '#btnToggleReplaceOnu', function() {
+        var isReplaced = $('#edit_is_onu_replaced').val() === '1';
+        if (!isReplaced) {
+            $('#edit_is_onu_replaced').val('1');
+            var curOnu = $('#edit_onu').val().trim();
+            $('#edit_old_onu_sn').val(curOnu);
+            $('#edit_onu').prop('readonly', true).addClass('bg-light');
+            $(this).html('<i class="bi bi-x-circle"></i> Cancel')
+                .removeClass('btn-outline-primary')
+                .addClass('btn-outline-danger');
+            $('#replaceOnuContainer').removeClass('d-none');
+            loadAvailableOnus();
+        } else {
+            resetOnuReplaceState();
+        }
+    });
+
+    $('#editCustomerModal').on('hidden.bs.modal', function() {
+        resetOnuReplaceState();
+    });
+
     function fetchAndOpenEditModal(customerId) {
+        resetOnuReplaceState();
         $.get('../ajax/get_customer.php?id=' + customerId, function(res) {
             if (res.status === 'success') {
                 var data = res.data;
@@ -2355,6 +2433,14 @@ table.on('draw', function() {
 
     $('#editCustomerForm').on('submit', function(e) {
         e.preventDefault();
+        if ($('#edit_is_onu_replaced').val() === '1') {
+            var newOnu = $('#edit_new_onu_sn').val();
+            if (!newOnu) {
+                showToast('error', 'Please select a new ONU from store to complete replacement.');
+                $('#edit_new_onu_sn').focus();
+                return false;
+            }
+        }
         var btn = $('#saveEditCustomerBtn');
         btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Saving...');
         $.ajax({
