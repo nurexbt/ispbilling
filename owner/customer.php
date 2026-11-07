@@ -1752,6 +1752,7 @@ table.on('draw', function() {
                             invoicesHtml += '<div class="btn-group">';
                             invoicesHtml += '<a href="../print_invoice.php?id=' + item.id + '&format=pos" target="_blank" class="btn btn-sm btn-light border-slate-200 text-slate-600" title="Print POS Receipt" style="font-size: 11px; padding: 2px 6px;"><i class="bi bi-receipt"></i></a>';
                             invoicesHtml += '<a href="../print_invoice.php?id=' + item.id + '&format=general" target="_blank" class="btn btn-sm btn-light border-slate-200 text-slate-600" title="Print A4 Invoice" style="font-size: 11px; padding: 2px 6px;"><i class="bi bi-printer"></i></a>';
+                            invoicesHtml += '<button type="button" class="btn btn-sm btn-outline-danger btn-delete-invoice-ledger" data-id="' + item.id + '" data-amount="' + item.amount + '" data-due="' + (item.due_amount || 0) + '" data-desc="' + item.description + '" title="Delete Bill" style="font-size: 11px; padding: 2px 6px;"><i class="bi bi-trash"></i></button>';
                             invoicesHtml += '</div>';
                             invoicesHtml += '</td>';
                             invoicesHtml += '</tr>';
@@ -1890,6 +1891,53 @@ table.on('draw', function() {
                 } else {
                     showToast('error', response.message);
                 }
+            }
+        });
+    });
+
+    // Delete Generated Bill from Customer Ledger
+    $(document).on('click', '.btn-delete-invoice-ledger', function() {
+        var invId = $(this).data('id');
+        var amount = parseFloat($(this).data('amount')) || 0;
+        var due = parseFloat($(this).data('due')) || 0;
+        var desc = $(this).data('desc') || 'Bill';
+        var custId = $('#ledgerCustomerId').val();
+
+        Swal.fire({
+            title: 'Delete this Bill?',
+            html: '<div class="text-start" style="font-size: 13px;">' +
+                  '<div class="mb-2">Are you sure you want to delete <strong>' + $('<div>').text(desc).html() + '</strong> (৳' + amount.toFixed(2) + ')?</div>' +
+                  '<div class="alert alert-warning py-2 px-3 mb-0" style="font-size: 12px; line-height: 1.4;">' +
+                  '<i class="bi bi-exclamation-triangle-fill me-1"></i> This will delete the invoice, deduct <strong>৳' + due.toFixed(2) + '</strong> from customer due balance, revert any auto-adjusted advance, and step back the billing cycle.' +
+                  '</div></div>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: '<i class="bi bi-trash me-1"></i> Yes, Delete Bill',
+            cancelButtonText: 'Cancel'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '../ajax/delete_generated_bill.php',
+                    type: 'POST',
+                    data: { invoice_id: invId },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            showToast('success', res.message);
+                            loadLedger(custId);
+                            if (typeof table !== 'undefined' && table.ajax) {
+                                table.ajax.reload(null, false);
+                            }
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to delete bill' });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while deleting bill.' });
+                    }
+                });
             }
         });
     });

@@ -89,13 +89,39 @@ $unpaid_count = (int)($kpi['unpaid_count'] ?? 0);
 $partial_count = (int)($kpi['partial_count'] ?? 0);
 
 // -------------------------------------------------------------
+// Check for Duplicate Bills for the Selected Month
+// -------------------------------------------------------------
+$dup_cust_ids = [];
+$dup_list_stmt = $conn->prepare("SELECT customer_id 
+                                  FROM invoice_tbl 
+                                  WHERE (billing_month = ? OR billing_month = ?)
+                                    AND (description IS NULL OR description = '' OR description = 'Monthly Bill' OR description NOT IN ('Connection Fee', 'Deposit', 'Previous Due'))
+                                  GROUP BY customer_id 
+                                  HAVING COUNT(*) > 1");
+$dup_list_stmt->bind_param("ss", $selected_month, $alt_selected_month);
+$dup_list_stmt->execute();
+$dl_res = $dup_list_stmt->get_result();
+while ($dl_row = $dl_res->fetch_assoc()) {
+    $dup_cust_ids[(int)$dl_row['customer_id']] = true;
+}
+$dup_list_stmt->close();
+$dup_cust_count = count($dup_cust_ids);
+
+// -------------------------------------------------------------
 // Fetch Invoices List
 // -------------------------------------------------------------
 $where_clauses = ["(i.billing_month = ? OR i.billing_month = ?)"];
 $params = [$selected_month, $alt_selected_month];
 $types = "ss";
 
-if (!empty($filter_status)) {
+if ($filter_status === 'Duplicates') {
+    if (!empty($dup_cust_ids)) {
+        $dup_ids_str = implode(',', array_keys($dup_cust_ids));
+        $where_clauses[] = "i.customer_id IN ($dup_ids_str)";
+    } else {
+        $where_clauses[] = "1=0";
+    }
+} elseif (!empty($filter_status)) {
     $where_clauses[] = "i.status = ?";
     $params[] = $filter_status;
     $types .= "s";
@@ -160,6 +186,13 @@ $stmt->close();
             <p class="text-slate-500 mb-0" style="font-size: 13px;">Month-wise generated customer invoices, balances, and billing management</p>
         </div>
         <div class="d-flex align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-warning btn-sm px-3 shadow-sm d-flex align-items-center gap-2" id="btnOpenDuplicateChecker" data-month="<?= htmlspecialchars($selected_month) ?>">
+                <i class="bi bi-copy"></i>
+                <span>Check Duplicates</span>
+                <?php if ($dup_cust_count > 0): ?>
+                <span class="badge bg-danger rounded-pill px-2" style="font-size: 10px;"><?= $dup_cust_count ?></span>
+                <?php endif; ?>
+            </button>
             <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-2" id="btnRunGenerateBills">
                 <i class="bi bi-magic"></i>
                 <span>Generate Bills</span>
@@ -217,6 +250,11 @@ $stmt->close();
                         <option value="Paid" <?= ($filter_status === 'Paid') ? 'selected' : '' ?>>Paid (<?= number_format($paid_count) ?>)</option>
                         <option value="Unpaid" <?= ($filter_status === 'Unpaid') ? 'selected' : '' ?>>Unpaid (<?= number_format($unpaid_count) ?>)</option>
                         <option value="Partial" <?= ($filter_status === 'Partial') ? 'selected' : '' ?>>Partial (<?= number_format($partial_count) ?>)</option>
+                        <?php if ($dup_cust_count > 0 || $filter_status === 'Duplicates'): ?>
+                        <option value="Duplicates" <?= ($filter_status === 'Duplicates') ? 'selected' : '' ?> class="text-danger fw-semibold">
+                            ⚠️ Duplicates (<?= $dup_cust_count ?>)
+                        </option>
+                        <?php endif; ?>
                     </select>
                 </div>
 
@@ -247,6 +285,27 @@ $stmt->close();
             </form>
         </div>
     </div>
+
+    <?php if ($dup_cust_count > 0): ?>
+    <!-- Duplicate Bills Warning Banner -->
+    <div class="alert alert-warning border-0 shadow-sm d-flex flex-column flex-md-row align-items-md-center justify-content-between p-3 mb-4 gap-3" style="border-radius: 12px; background: #fffbeb; border-left: 4px solid #f59e0b !important;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 18px; flex-shrink: 0;">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div>
+                <div class="fw-bold text-slate-800" style="font-size: 14px;">Duplicate Bills Detected for <?= htmlspecialchars($selected_month_label) ?></div>
+                <div class="text-slate-600" style="font-size: 12px;">Found <strong><?= $dup_cust_count ?></strong> customer(s) with 2 or more generated bills this month. In accordance with ISP billing policy: if all are unpaid, 1 will be kept and extra duplicates will be deleted & deducted from customer due balances.</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <button type="button" class="btn btn-warning btn-sm px-3 fw-semibold text-dark shadow-sm d-flex align-items-center gap-2 btn-open-dup-modal" data-month="<?= htmlspecialchars($selected_month) ?>">
+                <i class="bi bi-search"></i>
+                <span>Review & Clean Duplicates</span>
+            </button>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Summary KPI Cards -->
     <div class="row g-3 mb-4">
@@ -399,7 +458,14 @@ $stmt->close();
                                     <span class="fw-bold text-slate-800" style="font-family: monospace;">#INV-<?= str_pad($inv_id, 6, '0', STR_PAD_LEFT) ?></span>
                                 </td>
                                 <td>
-                                    <div class="fw-semibold text-slate-800"><?= htmlspecialchars($inv['customer_name'] ?? 'Unknown') ?></div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="fw-semibold text-slate-800"><?= htmlspecialchars($inv['customer_name'] ?? 'Unknown') ?></span>
+                                        <?php if (isset($dup_cust_ids[$c_id])): ?>
+                                        <span class="badge bg-warning-subtle text-dark border border-warning" style="font-size: 9px; cursor: pointer;" title="Customer has multiple bills in this month - Click to inspect" onclick="loadDuplicateBills('<?= htmlspecialchars($selected_month) ?>')">
+                                            <i class="bi bi-copy me-1"></i>Dup
+                                        </span>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="d-flex align-items-center gap-1 mt-1">
                                         <?php if (!empty($inv['customer_username'])): ?>
                                         <span class="badge border border-slate-200" style="font-size: 11px; font-family: monospace; font-weight: 600; color: #1e293b !important; background-color: #f1f5f9 !important;">
@@ -482,6 +548,47 @@ $stmt->close();
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicate Bills Modal -->
+<div class="modal fade" id="duplicateBillsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+            <div class="modal-header bg-white border-bottom border-slate-200 py-3 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-warning-subtle text-warning rounded-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 18px;">
+                        <i class="bi bi-copy"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-slate-800 mb-0">Duplicate Bill Checker — <span id="dupModalMonthTitle"><?= htmlspecialchars($selected_month_label) ?></span></h5>
+                        <p class="text-slate-500 mb-0" style="font-size: 12px;">Identify and resolve multiple generated bills for the same month</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-4" id="dupModalBody">
+                <div class="text-center py-5" id="dupModalLoader">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <div class="text-slate-600 fw-medium">Scanning for duplicate bills in <?= htmlspecialchars($selected_month_label) ?>...</div>
+                </div>
+                <div id="dupModalResults" style="display: none;"></div>
+            </div>
+
+            <div class="modal-footer bg-light border-top border-slate-200 py-3 px-4 d-flex justify-content-between align-items-center">
+                <div class="text-slate-600" style="font-size: 12px;" id="dupModalFooterSummary"></div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-light border-slate-200 text-slate-600 btn-sm px-3" data-bs-dismiss="modal">Close</button>
+                    <?php if (has_permission('customer_delete') || has_permission('customer_edit') || has_permission('owner_full_access')): ?>
+                    <button type="button" class="btn btn-danger btn-sm px-3 shadow-sm d-flex align-items-center gap-2" id="btnCleanAllDuplicatesModal" style="display: none;">
+                        <i class="bi bi-trash3-fill"></i>
+                        <span>Clean All Unpaid Duplicates</span>
+                    </button>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -758,6 +865,291 @@ $(document).ready(function() {
                             title: 'Server Error',
                             text: 'Failed to communicate with bill generator.'
                         });
+                    }
+                });
+            }
+        });
+    });
+
+    // ---------------------------------------------------------
+    // Duplicate Bills Checker Modal & Handlers
+    // ---------------------------------------------------------
+    var selectedMonth = '<?= htmlspecialchars($selected_month) ?>';
+    var ajaxPrefix = '<?= $base_path ?? '' ?>';
+
+    window.loadDuplicateBills = function(month) {
+        month = month || selectedMonth;
+        var $modal = $('#duplicateBillsModal');
+        var $loader = $('#dupModalLoader');
+        var $results = $('#dupModalResults');
+        var $footerSummary = $('#dupModalFooterSummary');
+        var $cleanAllBtn = $('#btnCleanAllDuplicatesModal');
+
+        $loader.show();
+        $results.hide().html('');
+        $cleanAllBtn.hide();
+        $footerSummary.html('');
+        $modal.modal('show');
+
+        $.ajax({
+            url: ajaxPrefix + 'ajax/check_duplicate_bills.php',
+            type: 'GET',
+            data: { month: month },
+            dataType: 'json',
+            success: function(res) {
+                $loader.hide();
+                $results.show();
+
+                if (res.status !== 'success') {
+                    $results.html('<div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i> ' + (res.message || 'Failed to load duplicate bills') + '</div>');
+                    return;
+                }
+
+                $('#dupModalMonthTitle').text(res.month_label);
+
+                if (res.total_duplicate_customers === 0) {
+                    $results.html(
+                        '<div class="text-center py-5">' +
+                        '  <div class="bg-success-subtle text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px; font-size: 32px;">' +
+                        '    <i class="bi bi-check2-circle"></i>' +
+                        '  </div>' +
+                        '  <h5 class="fw-bold text-slate-800">No Duplicate Bills Found!</h5>' +
+                        '  <p class="text-slate-500 mb-0" style="font-size: 13px;">Every customer has at most 1 generated monthly bill for <strong>' + $('<div>').text(res.month_label).html() + '</strong>.</p>' +
+                        '</div>'
+                    );
+                    return;
+                }
+
+                // If duplicates found
+                var html = '';
+                html += '<div class="alert alert-info border-0 shadow-sm mb-4" style="border-radius: 10px; background: #f0f9ff; border-left: 4px solid #0284c7 !important;">';
+                html += '  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">';
+                html += '    <div>';
+                html += '      <strong class="text-slate-800" style="font-size: 13px;">Duplicate Handling Rules Applied:</strong>';
+                html += '      <ul class="mb-0 text-slate-600 mt-1" style="font-size: 12px; padding-left: 18px;">';
+                html += '        <li>If a customer has a <strong>Paid</strong> bill, it is kept; extra unpaid bills are removed.</li>';
+                html += '        <li>If all bills are <strong>Unpaid</strong>, <strong>1 bill is kept</strong> (earliest created) and others are removed.</li>';
+                html += '        <li>Deleting extra unpaid bills will automatically <strong>deduct the duplicate amounts from customer dues</strong> and adjust their billing cycle dates.</li>';
+                html += '      </ul>';
+                html += '    </div>';
+                html += '    <div class="text-md-end ps-md-3 flex-shrink-0">';
+                html += '      <span class="badge bg-danger px-3 py-2" style="font-size: 12px;">' + res.total_duplicate_customers + ' Customer(s) with Duplicates</span>';
+                html += '    </div>';
+                html += '  </div>';
+                html += '</div>';
+
+                // Render each customer duplicate group
+                $.each(res.duplicate_groups, function(idx, grp) {
+                    html += '<div class="card border border-slate-200 shadow-sm mb-3" style="border-radius: 10px; overflow: hidden;">';
+                    html += '  <div class="card-header bg-white py-2 px-3 d-flex flex-wrap align-items-center justify-content-between border-bottom border-slate-200 gap-2">';
+                    html += '    <div class="d-flex align-items-center flex-wrap gap-2">';
+                    html += '      <span class="badge bg-slate-100 text-slate-700 border border-slate-200" style="font-size: 11px;">#' + (idx + 1) + '</span>';
+                    html += '      <span class="fw-bold text-slate-800" style="font-size: 13px;">' + $('<div>').text(grp.customer_name).html() + '</span>';
+                    if (grp.customer_username) {
+                        html += '    <span class="badge bg-light text-dark border border-slate-200" style="font-family: monospace; font-size: 11px;"><i class="bi bi-person me-1 text-primary"></i>' + $('<div>').text(grp.customer_username).html() + '</span>';
+                    }
+                    if (grp.customer_phone) {
+                        html += '    <span class="text-slate-500" style="font-size: 11px;"><i class="bi bi-telephone me-1"></i>' + $('<div>').text(grp.customer_phone).html() + '</span>';
+                    }
+                    if (grp.area_name) {
+                        html += '    <span class="text-slate-400" style="font-size: 11px;"><i class="bi bi-geo-alt me-1"></i>' + $('<div>').text(grp.area_name).html() + '</span>';
+                    }
+                    html += '    </div>';
+                    html += '    <div class="d-flex align-items-center gap-2">';
+                    html += '      <span class="text-slate-500" style="font-size: 12px;">Current Due: <strong class="text-danger">৳' + parseFloat(grp.customer_current_due).toFixed(2) + '</strong></span>';
+                    if (grp.deletable_invoices.length > 0) {
+                        html += '    <button type="button" class="btn btn-sm btn-outline-danger btn-clean-single-dup px-2 py-1" style="font-size: 11px;" data-customer-id="' + grp.customer_id + '" data-customer-name="' + $('<div>').text(grp.customer_name).html() + '" data-count="' + grp.deletable_invoices.length + '" data-amount="' + grp.customer_deletable_amount + '">';
+                        html += '      <i class="bi bi-trash me-1"></i> Clean (' + grp.deletable_invoices.length + ' dup, -৳' + parseFloat(grp.customer_deletable_amount).toFixed(2) + ')';
+                        html += '    </button>';
+                    }
+                    html += '    </div>';
+                    html += '  </div>';
+
+                    // Table of invoices
+                    html += '  <div class="table-responsive">';
+                    html += '    <table class="table table-sm align-middle mb-0" style="font-size: 12px;">';
+                    html += '      <thead class="bg-light text-slate-600" style="font-size: 11px;">';
+                    html += '        <tr>';
+                    html += '          <th class="ps-3">Invoice #</th>';
+                    html += '          <th>Bill Month</th>';
+                    html += '          <th class="text-end">Amount</th>';
+                    html += '          <th class="text-end">Paid</th>';
+                    html += '          <th class="text-end">Due</th>';
+                    html += '          <th class="text-center">Status</th>';
+                    html += '          <th>Created Date</th>';
+                    html += '          <th class="text-end pe-3">Action Plan</th>';
+                    html += '        </tr>';
+                    html += '      </thead>';
+                    html += '      <tbody>';
+
+                    // Kept invoice row
+                    var kept = grp.kept_invoice;
+                    html += '        <tr class="table-success" style="--bs-table-bg-opacity: 0.25;">';
+                    html += '          <td class="ps-3 fw-bold" style="font-family: monospace;">#INV-' + String(kept.id).padStart(6, '0') + '</td>';
+                    html += '          <td>' + kept.billing_month + '</td>';
+                    html += '          <td class="text-end fw-bold">৳' + parseFloat(kept.amount).toFixed(2) + '</td>';
+                    html += '          <td class="text-end text-success">৳' + parseFloat(kept.paid_amount).toFixed(2) + '</td>';
+                    html += '          <td class="text-end ' + (parseFloat(kept.due_amount) > 0 ? 'text-danger' : 'text-slate-400') + '">৳' + parseFloat(kept.due_amount).toFixed(2) + '</td>';
+                    html += '          <td class="text-center"><span class="badge bg-secondary px-2 py-1" style="font-size: 10px;">' + kept.status + '</span></td>';
+                    html += '          <td class="text-slate-500">' + (kept.created_at || '-') + '</td>';
+                    html += '          <td class="text-end pe-3"><span class="badge bg-success text-white px-2 py-1" style="font-size: 10px;"><i class="bi bi-check-circle-fill me-1"></i> KEEP THIS BILL</span></td>';
+                    html += '        </tr>';
+
+                    // Deletable duplicate rows
+                    $.each(grp.deletable_invoices, function(i, dInv) {
+                        html += '      <tr class="table-danger" style="--bs-table-bg-opacity: 0.2;">';
+                        html += '        <td class="ps-3 fw-bold text-danger" style="font-family: monospace;">#INV-' + String(dInv.id).padStart(6, '0') + '</td>';
+                        html += '        <td>' + dInv.billing_month + '</td>';
+                        html += '        <td class="text-end fw-bold text-danger">৳' + parseFloat(dInv.amount).toFixed(2) + '</td>';
+                        html += '        <td class="text-end text-success">৳' + parseFloat(dInv.paid_amount).toFixed(2) + '</td>';
+                        html += '        <td class="text-end text-danger fw-bold">৳' + parseFloat(dInv.due_amount).toFixed(2) + '</td>';
+                        html += '        <td class="text-center"><span class="badge bg-danger px-2 py-1" style="font-size: 10px;">' + dInv.status + '</span></td>';
+                        html += '        <td class="text-slate-500">' + (dInv.created_at || '-') + '</td>';
+                        html += '        <td class="text-end pe-3"><span class="badge bg-danger text-white px-2 py-1" style="font-size: 10px;"><i class="bi bi-trash-fill me-1"></i> DELETE (Deduct ৳' + parseFloat(dInv.due_amount).toFixed(2) + ')</span></td>';
+                        html += '      </tr>';
+                    });
+
+                    // Other duplicates (e.g. multiple paid bills)
+                    $.each(grp.other_duplicates, function(i, oInv) {
+                        html += '      <tr>';
+                        html += '        <td class="ps-3 fw-bold" style="font-family: monospace;">#INV-' + String(oInv.id).padStart(6, '0') + '</td>';
+                        html += '        <td>' + oInv.billing_month + '</td>';
+                        html += '        <td class="text-end fw-bold">৳' + parseFloat(oInv.amount).toFixed(2) + '</td>';
+                        html += '        <td class="text-end text-success">৳' + parseFloat(oInv.paid_amount).toFixed(2) + '</td>';
+                        html += '        <td class="text-end text-danger">৳' + parseFloat(oInv.due_amount).toFixed(2) + '</td>';
+                        html += '        <td class="text-center"><span class="badge bg-success px-2 py-1" style="font-size: 10px;">' + oInv.status + '</span></td>';
+                        html += '        <td class="text-slate-500">' + (oInv.created_at || '-') + '</td>';
+                        html += '        <td class="text-end pe-3"><span class="badge bg-warning text-dark px-2 py-1" style="font-size: 10px;">Paid Duplicate (Manual)</span></td>';
+                        html += '      </tr>';
+                    });
+
+                    html += '      </tbody>';
+                    html += '    </table>';
+                    html += '  </div>';
+                    html += '</div>';
+                });
+
+                $results.html(html);
+
+                if (res.total_deletable_bills > 0) {
+                    $cleanAllBtn.show()
+                        .data('month', month)
+                        .data('count', res.total_deletable_bills)
+                        .data('amount', res.total_deletable_amount);
+                    $cleanAllBtn.html('<i class="bi bi-trash3-fill me-1"></i> Clean All ' + res.total_deletable_bills + ' Duplicates (-৳' + parseFloat(res.total_deletable_amount).toFixed(2) + ')');
+                    $footerSummary.html('Found <strong>' + res.total_deletable_bills + '</strong> redundant unpaid duplicate bill(s) totaling <strong>৳' + parseFloat(res.total_deletable_amount).toFixed(2) + '</strong> to be deducted.');
+                } else {
+                    $footerSummary.html('All duplicates have already been handled.');
+                }
+            },
+            error: function() {
+                $loader.hide();
+                $results.show().html('<div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i> Failed to communicate with duplicate checker server endpoint.</div>');
+            }
+        });
+    };
+
+    $(document).on('click', '#btnOpenDuplicateChecker, #btnBannerCheckDuplicates, .btn-open-dup-modal', function(e) {
+        e.preventDefault();
+        var month = $(this).data('month') || selectedMonth;
+        loadDuplicateBills(month);
+    });
+
+    // Clean Single Customer Duplicates
+    $(document).on('click', '.btn-clean-single-dup', function(e) {
+        e.preventDefault();
+        var custId = $(this).data('customer-id');
+        var custName = $(this).data('customer-name');
+        var count = $(this).data('count');
+        var amount = parseFloat($(this).data('amount')) || 0;
+
+        Swal.fire({
+            title: 'Delete Duplicate Bills?',
+            html: '<div class="text-start" style="font-size: 13px;">' +
+                  'Delete <strong>' + count + '</strong> duplicate unpaid bill(s) for <strong>' + $('<div>').text(custName).html() + '</strong>?<br><br>' +
+                  '<div class="alert alert-warning py-2 px-3 mb-0" style="font-size: 12px; line-height: 1.4;">' +
+                  '<i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>1 bill will be kept</strong>. Total <strong>৳' + amount.toFixed(2) + '</strong> will be deducted from customer due, and billing cycle date will be adjusted.' +
+                  '</div></div>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, Clean Duplicates',
+            cancelButtonText: 'Cancel'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Cleaning...', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+
+                $.ajax({
+                    url: ajaxPrefix + 'ajax/clean_duplicate_bills.php',
+                    type: 'POST',
+                    data: { month: selectedMonth, customer_id: custId },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Duplicates Cleaned',
+                                text: res.message
+                            }).then(function() {
+                                window.location.reload();
+                            });
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to clean duplicates' });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while cleaning duplicates.' });
+                    }
+                });
+            }
+        });
+    });
+
+    // Clean All Duplicates in Modal
+    $('#btnCleanAllDuplicatesModal').on('click', function(e) {
+        e.preventDefault();
+        var month = $(this).data('month') || selectedMonth;
+        var count = $(this).data('count');
+        var amount = parseFloat($(this).data('amount')) || 0;
+
+        Swal.fire({
+            title: 'Clean ALL Duplicate Bills?',
+            html: '<div class="text-start" style="font-size: 13px;">' +
+                  'This will delete <strong>' + count + '</strong> redundant unpaid duplicate bill(s) for <strong>' + $('#dupModalMonthTitle').text() + '</strong>.<br><br>' +
+                  '<div class="alert alert-danger py-2 px-3 mb-0" style="font-size: 12px; line-height: 1.4;">' +
+                  '<i class="bi bi-exclamation-octagon-fill me-1"></i> For each customer, exactly 1 bill will be kept. Total <strong>৳' + amount.toFixed(2) + '</strong> will be <strong>deducted from customer dues</strong> across all affected customers.' +
+                  '</div></div>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, Clean All Duplicates',
+            cancelButtonText: 'Cancel'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Cleaning all duplicates...', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+
+                $.ajax({
+                    url: ajaxPrefix + 'ajax/clean_duplicate_bills.php',
+                    type: 'POST',
+                    data: { month: month },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Duplicate Cleanup Complete',
+                                html: res.message
+                            }).then(function() {
+                                window.location.reload();
+                            });
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to clean duplicates' });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while cleaning duplicates.' });
                     }
                 });
             }

@@ -81,6 +81,11 @@ $company_initials = strtoupper(substr($company_name, 0, 2));
                         </a>
                     </li>
                     <li class="nav-item mb-1">
+                        <a href="generated_bills.php" class="nav-link <?php echo (isset($active_menu) && $active_menu == 'generated_bills') ? 'active' : ''; ?>">
+                            <i class="bi bi-file-earmark-ruled"></i> <span>Generated Bills</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mb-1">
                         <a href="amount_collect.php" class="nav-link <?php echo (isset($active_menu) && $active_menu == 'amount_collect') ? 'active' : ''; ?>">
                             <i class="bi bi-cash-coin"></i> <span>Amount Collect</span>
                         </a>
