@@ -1,7 +1,10 @@
 :root {
     --bg-slate-50: #F8FAFC;
+    --bg-slate-100: #F1F5F9;
     --bg-white: #FFFFFF;
     --text-slate-900: #0F172A;
+    --text-slate-800: #1E293B;
+    --text-slate-700: #334155;
     --text-slate-600: #475569;
     --text-slate-500: #64748B;
     --text-slate-400: #94A3B8;
@@ -21,12 +24,21 @@ body {
 
 /* Typography & Colors Utilities */
 .text-slate-900 { color: var(--text-slate-900) !important; }
+.text-slate-800 { color: var(--text-slate-800) !important; }
+.text-slate-700 { color: var(--text-slate-700) !important; }
 .text-slate-600 { color: var(--text-slate-600) !important; }
 .text-slate-500 { color: var(--text-slate-500) !important; }
 .text-slate-400 { color: var(--text-slate-400) !important; }
+.bg-slate-100 { background-color: var(--bg-slate-100) !important; }
 .bg-slate-50 { background-color: var(--bg-slate-50) !important; }
 .border-slate-200 { border-color: var(--border-slate-200) !important; }
 .border-slate-100 { border-color: var(--border-slate-100) !important; }
+
+/* Ensure badges with light or slate background have readable dark text */
+.badge.bg-light,
+.badge.bg-slate-100 {
+    color: var(--text-slate-700) !important;
+}
 
 /* Structural Overrides */
 .rounded-xl { border-radius: 0.75rem !important; }

@@ -31,7 +31,27 @@ try {
                 continue;
             }
             
+            $current_month = date('Y-m');
             $billing_month = date('Y-m', strtotime($customer['payment_cycle_date']));
+            
+            // Condition: In running month, NEVER generate next month's bill
+            if ($billing_month > $current_month) {
+                continue;
+            }
+            
+            // Check if monthly bill already generated for this customer for this month
+            $billing_month_text = date('F-Y', strtotime($billing_month . '-01'));
+            $check = $conn->prepare("SELECT id FROM invoice_tbl 
+                                     WHERE customer_id = ? 
+                                       AND (billing_month = ? OR billing_month = ?) 
+                                       AND (description IS NULL OR description = '' OR description = 'Monthly Bill' OR description NOT IN ('Connection Fee', 'Deposit', 'Previous Due'))");
+            $check->bind_param("iss", $customer_id, $billing_month, $billing_month_text);
+            $check->execute();
+            if ($check->get_result()->num_rows > 0) {
+                $check->close();
+                continue; // Already generated
+            }
+            $check->close();
             
             $advance = (float)$customer['advance_payment'];
             

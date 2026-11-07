@@ -180,6 +180,13 @@ $company_initials = strtoupper(substr($company_name, 0, 2));
                         </a>
                     </li>
                     <?php endif; ?>
+                    <?php if (!$is_manager && (has_permission('customer_view') || has_permission('payment_record_view'))): ?>
+                    <li class="nav-item mb-1">
+                        <a href="<?php echo $base_path; ?>generated_bills.php" class="nav-link <?php echo (isset($active_menu) && $active_menu == 'generated_bills') ? 'active' : ''; ?>">
+                            <i class="bi bi-file-earmark-ruled"></i> <span>Generated Bills</span>
+                        </a>
+                    </li>
+                    <?php endif; ?>
                     <?php if (!$is_manager && has_permission('amount_collect_view')): ?>
                     <li class="nav-item mb-1">
                         <a href="<?php echo $base_path; ?>amount_collect.php" class="nav-link <?php echo (isset($active_menu) && $active_menu == 'amount_collect') ? 'active' : ''; ?>">
