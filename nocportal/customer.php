@@ -876,9 +876,14 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
           <div class="row">
               <!-- Invoices Table (Left) -->
               <div class="col-md-6">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                      <h6 class="text-slate-700 mb-0" style="font-size: 13px; font-weight: 600;">Generated Bills</h6>
-                      <input type="text" id="searchInvoices" class="form-control form-control-sm w-50 shadow-none" placeholder="Search bills..." style="font-size: 11px;">
+                  <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+                      <div class="d-flex align-items-center gap-2">
+                          <h6 class="text-slate-700 mb-0" style="font-size: 13px; font-weight: 600;">Generated Bills</h6>
+                          <button type="button" class="btn btn-sm btn-primary py-0 px-2 shadow-sm d-inline-flex align-items-center gap-1" id="btnOpenCustomBillModal" style="font-size: 11px; height: 24px; border-radius: 6px;">
+                              <i class="bi bi-plus-circle"></i> Generate Custom Bill
+                          </button>
+                      </div>
+                      <input type="text" id="searchInvoices" class="form-control form-control-sm shadow-none" placeholder="Search bills..." style="font-size: 11px; max-width: 170px;">
                   </div>
                   <div class="table-responsive bg-white rounded-3 shadow-sm border border-slate-200">
                       <table id="ledgerInvoicesTable" class="table table-hover align-middle mb-0" style="font-size: 12px; width:100%;">
@@ -921,6 +926,62 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
               </div>
           </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Generate Custom Bill Modal -->
+<div class="modal fade" id="customBillModal" tabindex="-1" aria-hidden="true" style="z-index: 1070;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+      <div class="modal-header border-bottom border-slate-100 py-3 px-4 bg-light" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
+        <h5 class="modal-title text-slate-800 m-0" style="font-size: 15px; font-weight: 600;">
+          <i class="bi bi-receipt-cutoff text-primary me-2"></i>Generate Custom Bill
+        </h5>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close" style="font-size: 11px;"></button>
+      </div>
+      <form id="customBillForm">
+        <input type="hidden" name="customer_id" id="customBillCustomerId">
+        <div class="modal-body p-4">
+          <div class="mb-3 p-2 rounded bg-light border border-slate-200 d-flex justify-content-between align-items-center" style="font-size: 12px;">
+            <span class="text-slate-600">Customer: <strong id="customBillCustomerName" class="text-slate-800">-</strong></span>
+            <span class="badge bg-white text-success border border-success-subtle" id="customBillPkgBadge">Monthly: ৳0.00</span>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-slate-700 fw-semibold mb-1" style="font-size: 12px;">Bill Type <span class="text-danger">*</span></label>
+            <select name="bill_type" id="customBillType" class="form-select form-select-sm border-slate-200 shadow-none" required style="font-size: 13px;">
+              <option value="monthly">Monthly Bill</option>
+              <option value="connection_fee">Connection Fee Bill</option>
+              <option value="deposit">Deposit Bill</option>
+            </select>
+          </div>
+
+          <div class="mb-3" id="customBillMonthGroup">
+            <label class="form-label text-slate-700 fw-semibold mb-1" style="font-size: 12px;">Billing Month <span class="text-danger">*</span></label>
+            <input type="month" name="billing_month" id="customBillMonth" class="form-control form-control-sm border-slate-200 shadow-none" value="<?= date('Y-m') ?>" required style="font-size: 13px;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-slate-700 fw-semibold mb-1" style="font-size: 12px;">Amount (৳) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" min="0.01" name="amount" id="customBillAmount" class="form-control form-control-sm border-slate-200 shadow-none" placeholder="0.00" required style="font-size: 13px;">
+            <div class="form-text text-muted" id="customBillAmountHint" style="font-size: 11px;"></div>
+          </div>
+
+          <div class="form-check mt-2">
+            <input class="form-check-input shadow-none" type="checkbox" name="adjust_from_balance" id="customBillAdjustBalance" value="1" checked>
+            <label class="form-check-label text-slate-600" for="customBillAdjustBalance" style="font-size: 12px;">
+              Auto-adjust from advance balance (<span id="customBillAvailBalance" class="fw-semibold text-success">৳0.00</span>)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer border-top border-slate-100 py-2 px-4 bg-light" style="border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
+          <button type="button" class="btn btn-sm btn-light border-slate-200 text-slate-600" data-bs-dismiss="modal" style="font-size: 12px;">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary px-3 shadow-sm" id="saveCustomBillBtn" style="font-size: 12px;">
+            <i class="bi bi-check-circle me-1"></i>Generate Bill
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -1717,6 +1778,86 @@ table.on('draw', function() {
                 } else {
                     showToast('error', response.message);
                 }
+            }
+        });
+    });
+
+    // ---- Generate Custom Bill Modal ----
+    $(document).on('click', '#btnOpenCustomBillModal', function() {
+        var custId = $('#ledgerCustomerId').val();
+        var custName = $('#ledgerCustName').text() || '-';
+        var pkgPrice = parseFloat($('#ledgerCustPrice').text()) || 0;
+        var pkgDisc = parseFloat($('#ledgerCustDiscount').text()) || 0;
+        var netMonthly = Math.max(0, pkgPrice - pkgDisc);
+        var availBal = parseFloat($('#ledgerBalance').text().replace(/[^0-9.-]/g, '')) || 0;
+
+        window._customBillDefaultMonthly = netMonthly;
+        $('#customBillCustomerId').val(custId);
+        $('#customBillCustomerName').text(custName);
+        $('#customBillPkgBadge').text('Monthly: ৳' + netMonthly.toFixed(2));
+        $('#customBillAvailBalance').text('৳' + Math.max(0, availBal).toFixed(2));
+
+        if (availBal > 0) {
+            $('#customBillAdjustBalance').prop('disabled', false).prop('checked', true);
+        } else {
+            $('#customBillAdjustBalance').prop('disabled', true).prop('checked', false);
+        }
+
+        var now = new Date();
+        var curYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        $('#customBillMonth').val(curYm);
+        $('#customBillType').val('monthly').trigger('change');
+        $('#customBillModal').modal('show');
+    });
+
+    $('#customBillType').on('change', function() {
+        var bType = $(this).val();
+        var defMonthly = window._customBillDefaultMonthly || 0;
+        if (bType === 'monthly') {
+            $('#customBillAmount').val(defMonthly > 0 ? defMonthly.toFixed(2) : '');
+            $('#customBillAmountHint').text('Pre-filled with monthly package price minus discount (editable).');
+        } else if (bType === 'connection_fee') {
+            $('#customBillAmount').val('').focus();
+            $('#customBillAmountHint').text('One-time Connection Fee bill.');
+        } else if (bType === 'deposit') {
+            $('#customBillAmount').val('').focus();
+            $('#customBillAmountHint').text('One-time Security Deposit bill.');
+        }
+    });
+
+    $('#customBillModal').on('hidden.bs.modal', function() {
+        if ($('#ledgerModal').is(':visible')) {
+            $('body').addClass('modal-open');
+        }
+    });
+
+    $('#customBillForm').on('submit', function(e) {
+        e.preventDefault();
+        var $btn = $('#saveCustomBillBtn');
+        var origHtml = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Generating...');
+
+        $.ajax({
+            url: '../ajax/generate_custom_bill.php',
+            type: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function(res) {
+                $btn.prop('disabled', false).html(origHtml);
+                if (res.status === 'success') {
+                    showToast('success', res.message);
+                    $('#customBillModal').modal('hide');
+                    loadLedger($('#ledgerCustomerId').val());
+                    if (typeof table !== 'undefined' && table && table.ajax && table.ajax.url()) {
+                        table.ajax.reload(null, false);
+                    }
+                } else {
+                    showToast('error', res.message || 'Failed to generate custom bill.');
+                }
+            },
+            error: function() {
+                $btn.prop('disabled', false).html(origHtml);
+                showToast('error', 'Network error while generating custom bill.');
             }
         });
     });

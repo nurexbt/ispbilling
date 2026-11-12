@@ -75,21 +75,28 @@ try {
     // Deduct unpaid portion from customer's previous_due
     $new_due = max(0.0, $current_due - $unpaid_portion);
 
+    $is_monthly = empty($invoice['description']) || $invoice['description'] === 'Monthly Bill' || !in_array($invoice['description'], ['Connection Fee', 'Deposit', 'Previous Due']);
+
     // 3. Revert auto-adjusted payments or restore customer balance
     $alt_bm = (preg_match('/^\d{4}-\d{2}$/', $billing_month)) ? date('F-Y', strtotime($billing_month . '-01')) : $billing_month;
     $alt_bm2 = (preg_match('/^\d{4}-\d{2}$/', $billing_month)) ? date('F Y', strtotime($billing_month . '-01')) : $billing_month;
+    $desc_match = !$is_monthly && !empty($invoice['description']) ? $invoice['description'] : $billing_month;
 
     $adj_stmt = $conn->prepare("SELECT id, amount FROM payment_tbl 
                                 WHERE customer_id = ? 
-                                  AND (for_month = ? OR for_month = ? OR for_month = ?) 
-                                  AND payment_method IN ('Adjust', 'Balance')");
-    $adj_stmt->bind_param("isss", $customer_id, $billing_month, $alt_bm, $alt_bm2);
+                                  AND (for_month = ? OR for_month = ? OR for_month = ? OR for_month = ?) 
+                                  AND payment_method IN ('Adjust', 'Balance')
+                                ORDER BY id DESC");
+    $adj_stmt->bind_param("issss", $customer_id, $billing_month, $alt_bm, $alt_bm2, $desc_match);
     $adj_stmt->execute();
     $adj_res = $adj_stmt->get_result();
     
     $total_adjust_amount = 0.0;
     $adjust_payment_ids = [];
     while ($adj_row = $adj_res->fetch_assoc()) {
+        if ($paid_amount > 0 && ($total_adjust_amount + (float)$adj_row['amount']) > ($paid_amount + 0.01)) {
+            continue;
+        }
         $adjust_payment_ids[] = (int)$adj_row['id'];
         $total_adjust_amount += (float)$adj_row['amount'];
     }
@@ -109,12 +116,12 @@ try {
         }
     }
 
-    // 4. Step cycle date back by 1 month so it can be generated again if desired
+    // 4. Update balance (and step cycle date back by 1 month only if it was a monthly bill)
     $date_update_sql = "UPDATE customer_tbl 
                         SET previous_due = ?, 
-                            advance_payment = ?, 
-                            payment_cycle_date = DATE_SUB(payment_cycle_date, INTERVAL 1 MONTH)" . 
-                        ($status === 'Paid' ? ", billing_date = DATE_SUB(billing_date, INTERVAL 1 MONTH)" : "") . 
+                            advance_payment = ?" . 
+                        ($is_monthly ? ", payment_cycle_date = DATE_SUB(payment_cycle_date, INTERVAL 1 MONTH)" : "") . 
+                        ($is_monthly && $status === 'Paid' ? ", billing_date = DATE_SUB(billing_date, INTERVAL 1 MONTH)" : "") . 
                         " WHERE id = ?";
     $up_cust = $conn->prepare($date_update_sql);
     $up_cust->bind_param("ddi", $new_due, $new_advance, $customer_id);
