@@ -208,12 +208,20 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
                                     $statusClass = $isPaid ? 'bg-success' : 'bg-danger';
                                     $statusText = $isPaid ? 'Paid' : 'Unpaid';
                                     $pppoeDisabled = ($row['pppoe_status'] ?? '') === 'disable';
+                                    $isInactive = (isset($row['status']) && strcasecmp($row['status'], 'Inactive') === 0);
                                 ?>
-                                <span class="d-none">status-<?= strtolower($statusText) ?> <?= $pppoeDisabled ? 'pppoe-disabled' : 'pppoe-enabled' ?></span>
+                                <span class="d-none">status-<?= strtolower($statusText) ?> <?= $pppoeDisabled ? 'pppoe-disabled' : 'pppoe-enabled' ?> <?= $isInactive ? 'status-inactive' : 'status-active' ?></span>
                                 <?php 
                                     $routerStatusText = $pppoeDisabled ? 'Disabled' : 'Enabled';
                                     $routerBadgeClass = $pppoeDisabled ? 'bg-danger bg-opacity-10 text-danger border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border-success border-opacity-25';
                                 ?>
+                                <?php if ($isInactive): ?>
+                                <div class="mb-1 customer-inactive-badge">
+                                    <span class="badge bg-secondary text-white px-2 py-1" style="font-size: 10.5px; border-radius: 4px; font-weight: 600;">
+                                        <i class="bi bi-person-x-fill me-1"></i>Inactive
+                                    </span>
+                                </div>
+                                <?php endif; ?>
                                 <div class="badge <?= $statusClass ?> text-white px-2 py-1" style="font-size: 11px; border-radius: 4px; font-weight: 500;">
                                     <?= $statusText ?>
                                 </div>
@@ -739,6 +747,14 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
       <div class="modal-header border-bottom border-slate-100 bg-light py-3 px-4 d-flex justify-content-between align-items-center" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
         <h5 class="modal-title text-slate-800 m-0" style="font-size: 15px; font-weight: 600;"><i class="bi bi-wallet2 text-info me-2"></i>Payment Ledger: <span id="ledgerClientName" class="text-primary"></span></h5>
         <div class="d-flex align-items-center gap-3">
+            <!-- Customer Status Toggle (Active / Inactive) -->
+            <div class="d-flex align-items-center gap-2 bg-white px-2.5 py-1 rounded-pill border shadow-sm" style="font-size: 12px;" title="Customer Status: Toggle Active or Inactive">
+                <span class="text-slate-500 fw-medium" style="font-size: 11px;">Status:</span>
+                <div class="form-check form-switch m-0 d-flex align-items-center p-0">
+                    <input class="form-check-input m-0 me-1.5" type="checkbox" role="switch" id="ledgerCustomerStatusSwitch" style="cursor: pointer; width: 34px; height: 18px;">
+                    <span id="ledgerCustomerStatusBadge" class="badge bg-success" style="font-size: 10.5px; min-width: 55px; text-align: center; font-weight: 600;">Active</span>
+                </div>
+            </div>
             <!-- Promise Date Pill Trigger -->
             <div id="promiseDatePill" class="promise-date-pill" title="Click to set promise date">
                 <span class="pd-icon"><i class="bi bi-calendar-event"></i></span>
@@ -1759,6 +1775,18 @@ $(document).ready(function() {
                         $('#ledgerPaymentsTable').DataTable().destroy();
                     }
                     
+                    // Set Customer Status Switch & Badge
+                    var custStatus = response.data.status_val || 'Active';
+                    var isAct = (custStatus.toLowerCase() === 'active');
+                    $('#ledgerCustomerStatusSwitch').prop('checked', isAct);
+                    if (isAct) {
+                        $('#ledgerCustomerStatusBadge').text('Active').removeClass('bg-secondary bg-danger').addClass('bg-success');
+                        $('#btnOpenCustomBillModal').prop('disabled', false).removeClass('opacity-50').attr('title', 'Generate Custom Bill');
+                    } else {
+                        $('#ledgerCustomerStatusBadge').text('Inactive').removeClass('bg-success').addClass('bg-secondary');
+                        $('#btnOpenCustomBillModal').prop('disabled', true).addClass('opacity-50').attr('title', 'Cannot generate bills for Inactive customer (Restricted)');
+                    }
+
                     // Set Mikrotik Switch
                     $('#ledgerMikrotikSwitch').prop('checked', response.data.pppoe_status === 'enable');
 
@@ -1970,6 +1998,10 @@ $(document).ready(function() {
 
     // ---- Generate Custom Bill Modal ----
     $(document).on('click', '#btnOpenCustomBillModal', function() {
+        if (!$('#ledgerCustomerStatusSwitch').is(':checked')) {
+            showToast('error', 'Cannot generate bills! This customer is marked as Inactive (Restricted).');
+            return;
+        }
         var custId = $('#ledgerCustomerId').val();
         var custName = $('#ledgerCustName').text() || '-';
         var pkgPrice = parseFloat($('#ledgerCustPrice').text()) || 0;
@@ -2273,6 +2305,63 @@ $(document).ready(function() {
             error: function() {
                 $btn.html(originalHtml).prop('disabled', false);
                 showToast('error', 'Network error while processing transfer.');
+            }
+        });
+    });
+
+    // Customer Status Switch Toggle (Active / Inactive)
+    $('#ledgerCustomerStatusSwitch').on('change', function() {
+        var customerId = $('#ledgerCustomerId').val();
+        var isChecked = $(this).is(':checked');
+        var newStatus = isChecked ? 'Active' : 'Inactive';
+        var $switch = $(this);
+        var $badge = $('#ledgerCustomerStatusBadge');
+
+        $switch.prop('disabled', true);
+
+        $.ajax({
+            url: 'ajax/toggle_customer_status.php',
+            type: 'POST',
+            data: { id: customerId, status: newStatus },
+            dataType: 'json',
+            success: function(response) {
+                $switch.prop('disabled', false);
+                if (response.status === 'success') {
+                    showToast('success', response.message);
+                    if (newStatus === 'Active') {
+                        $badge.text('Active').removeClass('bg-secondary bg-danger').addClass('bg-success');
+                        $('#btnOpenCustomBillModal').prop('disabled', false).removeClass('opacity-50').attr('title', 'Generate Custom Bill');
+                    } else {
+                        $badge.text('Inactive').removeClass('bg-success').addClass('bg-secondary');
+                        $('#btnOpenCustomBillModal').prop('disabled', true).addClass('opacity-50').attr('title', 'Cannot generate bills for Inactive customer (Restricted)');
+                        $('#ledgerMikrotikSwitch').prop('checked', false);
+                    }
+
+                    if (typeof table !== 'undefined' && table && table.ajax && table.ajax.url()) {
+                        table.ajax.reload(null, false);
+                    } else {
+                        var $row = $('a.view-ledger[data-id="' + customerId + '"]').closest('tr');
+                        if ($row.length) {
+                            var $statusTd = $row.find('td').eq(7);
+                            $statusTd.find('.customer-inactive-badge').remove();
+                            if (newStatus === 'Inactive') {
+                                $statusTd.prepend('<div class="mb-1 customer-inactive-badge"><span class="badge bg-secondary text-white px-2 py-1" style="font-size: 10.5px; border-radius: 4px; font-weight: 600;"><i class="bi bi-person-x-fill me-1"></i>Inactive</span></div>');
+                                var $routerBadge = $statusTd.find('.router-status-badge');
+                                if ($routerBadge.length) {
+                                    $routerBadge.html('<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="font-size: 10px;"><i class="bi bi-router"></i> Disabled</span>');
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    showToast('error', response.message);
+                    $switch.prop('checked', !isChecked);
+                }
+            },
+            error: function() {
+                $switch.prop('disabled', false);
+                $switch.prop('checked', !isChecked);
+                showToast('error', 'Network error while updating customer status.');
             }
         });
     });

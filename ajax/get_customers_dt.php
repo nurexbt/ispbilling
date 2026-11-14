@@ -192,7 +192,13 @@ while ($row = $result->fetch_assoc()) {
     $routerBadgeClass = $pppoeDisabled ? 'bg-danger bg-opacity-10 text-danger border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border-success border-opacity-25';
 
     // Col 7: Status
-    $col7 = '<span class="d-none">status-' . strtolower($statusText) . ' ' . ($pppoeDisabled ? 'pppoe-disabled' : 'pppoe-enabled') . '</span>'
+    $isInactive = (isset($row['status']) && strcasecmp($row['status'], 'Inactive') === 0);
+    $inactiveBadge = $isInactive 
+        ? '<div class="mb-1 customer-inactive-badge"><span class="badge bg-secondary text-white px-2 py-1" style="font-size:10.5px;border-radius:4px;font-weight:600;"><i class="bi bi-person-x-fill me-1"></i>Inactive</span></div>' 
+        : '';
+
+    $col7 = '<span class="d-none">status-' . strtolower($statusText) . ' ' . ($pppoeDisabled ? 'pppoe-disabled' : 'pppoe-enabled') . ' ' . ($isInactive ? 'status-inactive' : 'status-active') . '</span>'
+          . $inactiveBadge
           . '<div class="badge ' . $statusClass . ' text-white px-2 py-1" style="font-size:11px;border-radius:4px;font-weight:500;">' . $statusText . '</div>'
           . '<div class="router-status-badge mt-1" data-username="' . htmlspecialchars($row['username']) . '">'
           . '<span class="badge ' . $routerBadgeClass . ' border" style="font-size:10px;"><i class="bi bi-router"></i> ' . $routerStatusText . '</span>'

@@ -9,16 +9,21 @@ header('Content-Type: application/json');
 
 $conn->begin_transaction();
 try {
-    // Select all customers where payment_cycle_date <= today and status is Active
-    $query = "SELECT id, package_price, discount, previous_due, advance_payment, billing_date, payment_cycle_date 
+    // Select all customers where payment_cycle_date <= today and status is Active (Strictly exclude Inactive)
+    $query = "SELECT id, status, package_price, discount, previous_due, advance_payment, billing_date, payment_cycle_date 
               FROM customer_tbl 
-              WHERE payment_cycle_date <= CURDATE() AND status = 'Active' FOR UPDATE";
+              WHERE payment_cycle_date <= CURDATE() AND status = 'Active' AND status != 'Inactive' FOR UPDATE";
     $result = $conn->query($query);
     
     $generated = 0;
     
     if ($result && $result->num_rows > 0) {
         while ($customer = $result->fetch_assoc()) {
+            // Strictly guard: Never generate automatic bill for inactive customer
+            if (isset($customer['status']) && strcasecmp($customer['status'], 'Active') !== 0) {
+                continue;
+            }
+
             $customer_id = $customer['id'];
             $bill_amount = (float)$customer['package_price'] - (float)$customer['discount'];
             

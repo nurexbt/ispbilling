@@ -47,7 +47,7 @@ $conn->begin_transaction();
 
 try {
     // 1. Lock and fetch customer record
-    $stmt = $conn->prepare("SELECT id, name, previous_due, advance_payment, billing_date, payment_cycle_date FROM customer_tbl WHERE id = ? FOR UPDATE");
+    $stmt = $conn->prepare("SELECT id, name, status, previous_due, advance_payment, billing_date, payment_cycle_date FROM customer_tbl WHERE id = ? FOR UPDATE");
     $stmt->bind_param("i", $customer_id);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -57,6 +57,11 @@ try {
     }
     $customer = $res->fetch_assoc();
     $stmt->close();
+
+    // Inactive customer check: Cannot generate bills for inactive customer
+    if (isset($customer['status']) && strcasecmp($customer['status'], 'Inactive') === 0) {
+        throw new Exception("Cannot generate bill! Customer '{$customer['name']}' is marked as Inactive (restricted).");
+    }
 
     // 2. Determine invoice description based on bill_type
     $description = null;

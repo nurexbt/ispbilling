@@ -16,10 +16,10 @@ try {
     $next_month = date('Y-m', strtotime('first day of next month')); // e.g. '2026-12'
     $next_month_text = date('F-Y', strtotime('first day of next month')); // e.g. 'December-2026'
     
-    // Select all active customers
-    $query = "SELECT id, package_price, discount, previous_due, advance_payment, billing_date, payment_cycle_date 
+    // Select all active customers (Strictly exclude Inactive)
+    $query = "SELECT id, status, package_price, discount, previous_due, advance_payment, billing_date, payment_cycle_date 
               FROM customer_tbl 
-              WHERE status = 'Active' FOR UPDATE";
+              WHERE status = 'Active' AND status != 'Inactive' FOR UPDATE";
     $result = $conn->query($query);
     
     $generated = 0;
@@ -27,6 +27,12 @@ try {
     
     if ($result && $result->num_rows > 0) {
         while ($customer = $result->fetch_assoc()) {
+            // Strictly guard: Never generate automatic bill for inactive customer
+            if (isset($customer['status']) && strcasecmp($customer['status'], 'Active') !== 0) {
+                $skipped++;
+                continue;
+            }
+
             $customer_id = (int)$customer['id'];
             
             // -------------------------------------------------------------
