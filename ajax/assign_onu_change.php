@@ -62,6 +62,18 @@ $cust_addr = $customer['address'];
 $cust_onu = $customer['onu_sn'] ?: '';
 $cust_user = $customer['username'] ?: '';
 
+// Auto-migrate connection_request_tbl columns if missing
+try {
+    $chk_cr = $conn->query("SHOW COLUMNS FROM connection_request_tbl LIKE 'customer_id'");
+    if ($chk_cr && $chk_cr->num_rows === 0) {
+        @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN customer_id INT(11) DEFAULT NULL AFTER pppoe_username");
+    }
+    $chk_rt = $conn->query("SHOW COLUMNS FROM connection_request_tbl LIKE 'request_type'");
+    if ($chk_rt && $chk_rt->num_rows === 0) {
+        @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN request_type VARCHAR(50) DEFAULT 'new_connection' AFTER customer_id");
+    }
+} catch (Throwable $e) {}
+
 // 3. Check if there is an existing pending assignment for this customer
 $chk_stmt = $conn->prepare("SELECT id, assigned_to FROM connection_request_tbl WHERE customer_id = ? AND request_type = 'onu_change' AND status = 'Assigned' LIMIT 1");
 $chk_stmt->bind_param("i", $customer_id);
