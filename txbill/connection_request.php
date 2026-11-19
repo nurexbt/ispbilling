@@ -66,7 +66,12 @@ if ($on_hand_result && $on_hand_result->num_rows > 0) {
                         <tr>
                             <td class="text-slate-500" style="font-size: 11px; padding: 12px 16px;"><?= $i++ ?></td>
                             <td style="padding: 12px 16px;">
-                                <div class="text-slate-900 mb-1" style="font-size: 13px; font-weight: 500;"><?= htmlspecialchars($row['name']) ?></div>
+                                <div class="text-slate-900 mb-1 d-flex align-items-center gap-1.5 flex-wrap" style="font-size: 13px; font-weight: 500;">
+                                    <span><?= htmlspecialchars($row['name']) ?></span>
+                                    <?php if (($row['request_type'] ?? '') === 'onu_change'): ?>
+                                        <span class="badge bg-warning text-dark border border-warning-subtle" style="font-size: 9.5px; font-weight: 600;"><i class="bi bi-arrow-repeat me-1"></i>ONU Change</span>
+                                    <?php endif; ?>
+                                </div>
                                 <div class="text-slate-500" style="font-size: 11px;"><?= htmlspecialchars($row['created_at']) ?></div>
                             </td>
                             <td style="padding: 12px 16px;">

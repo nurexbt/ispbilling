@@ -11,7 +11,7 @@ if (!$customer_id) {
 
 // Get customer details
 $stmt = $conn->prepare("
-    SELECT c.name, c.status, c.previous_due, c.advance_payment, c.pppoe_status, c.username, c.password, c.phone, c.address, c.nid_no, c.onu_sn, c.onu_submitted_by, c.package_price, c.discount, c.connection_date, c.billing_date, c.payment_cycle_date, c.router_id, c.promise_date, p.given_name as package_name, a.area_name, s.subarea_name
+    SELECT c.name, c.status, c.previous_due, c.advance_payment, c.pppoe_status, c.username, c.password, c.phone, c.address, c.nid_no, c.onu_sn, c.onu_submitted_by, c.package_price, c.discount, c.connection_date, c.billing_date, c.payment_cycle_date, c.router_id, c.promise_date, c.note, p.given_name as package_name, a.area_name, s.subarea_name
     FROM customer_tbl c
     LEFT JOIN package_tbl p ON c.package_id = p.id
     LEFT JOIN area_tbl a ON c.area_id = a.id
@@ -85,6 +85,7 @@ echo json_encode([
         'nid_no' => $customer['nid_no'],
         'onu_sn' => $customer['onu_sn'],
         'onu_submitted_by' => $customer['onu_submitted_by'],
+        'note' => $customer['note'],
         'username' => $customer['username'],
         'password' => $customer['password'],
         'package_name' => $customer['package_name'],

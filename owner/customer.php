@@ -500,27 +500,36 @@ $disabled_clients = intval($stats['disabled_customers'] ?? 0);
                 <div class="col-md-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label text-slate-600 mb-0" style="font-size: 12px; font-weight: 500;">ONU MAC/SN</label>
-                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 rounded-pill" id="btnToggleReplaceOnu" style="font-size: 10px; height: 20px; line-height: 18px;" title="Replace ONU from store">
-                            <i class="bi bi-arrow-repeat"></i> Replace
+                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 rounded-pill" id="btnToggleAssignOnu" style="font-size: 10px; height: 20px; line-height: 18px;" title="Assign technician to change ONU">
+                            <i class="bi bi-person-gear"></i> Change ONU
                         </button>
                     </div>
-                    <input type="text" name="onu_sn" id="edit_onu" class="form-control form-control-sm border-slate-200 shadow-none">
-                    <input type="hidden" name="is_onu_replaced" id="edit_is_onu_replaced" value="0">
-                    <input type="hidden" name="old_onu_sn" id="edit_old_onu_sn" value="">
+                    <input type="text" name="onu_sn" id="edit_onu" class="form-control form-control-sm border-slate-200 shadow-none" readonly style="background-color: #f8fafc; cursor: not-allowed;" title="Cannot edit ONU directly. Click 'Change ONU' to assign a technician.">
+                    <div class="text-slate-400 mt-1" style="font-size: 9.5px;" id="onuDirectHint">
+                        <i class="bi bi-lock-fill text-slate-400"></i> Direct edit disabled (Assign technician to change)
+                    </div>
 
-                    <!-- Replace ONU Section -->
-                    <div id="replaceOnuContainer" class="mt-2 p-2 rounded bg-light border border-primary-subtle d-none">
+                    <!-- Assign Technician to Change ONU Section -->
+                    <div id="assignOnuContainer" class="mt-2 p-2 rounded bg-light border border-primary-subtle d-none">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-primary fw-semibold" style="font-size: 11px;">
-                                <i class="bi bi-box-seam me-1"></i> New ONU (Store)
+                                <i class="bi bi-person-gear me-1"></i> Assign Technician
                             </span>
-                            <span class="badge bg-white text-secondary border" id="storeOnuCountBadge" style="font-size: 9px;">Checking...</span>
+                            <span class="badge bg-white text-secondary border" id="techCountBadge" style="font-size: 9px;">Loading...</span>
                         </div>
-                        <select name="new_onu_sn" id="edit_new_onu_sn" class="form-select form-select-sm border-primary shadow-none" style="font-size: 11px;">
-                            <option value="">Select available ONU...</option>
-                        </select>
-                        <div class="text-muted mt-1" style="font-size: 9.5px; line-height: 1.2;">
-                            <i class="bi bi-info-circle text-primary"></i> Current ONU will be marked as replaced, new ONU as delivered, and ticket will be created.
+                        <div class="mb-1.5">
+                            <select name="assign_technician_id" id="edit_assign_technician_id" class="form-select form-select-sm border-primary shadow-none" style="font-size: 11px;">
+                                <option value="">Select Technician...</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" name="assign_onu_note" id="edit_assign_onu_note" class="form-control form-control-sm shadow-none" placeholder="Reason (e.g. ONU faulty / upgrade)" style="font-size: 11px;">
+                        </div>
+                        <button type="button" class="btn btn-sm bg-primary text-white w-100 py-1 d-flex align-items-center justify-content-center gap-1 shadow-sm" id="btnConfirmAssignOnu" style="font-size: 11px; font-weight: 600;">
+                            <i class="bi bi-send-check"></i> Assign Task Now
+                        </button>
+                        <div id="activeAssignmentAlert" class="mt-1.5 text-warning fw-semibold d-none" style="font-size: 10px; line-height: 1.2;">
+                            <i class="bi bi-clock-history me-1"></i> <span id="activeAssignmentText"></span>
                         </div>
                     </div>
                 </div>
@@ -2546,62 +2555,101 @@ table.on('draw', function() {
         }
     });
 
-    function resetOnuReplaceState() {
-        $('#edit_is_onu_replaced').val('0');
-        $('#edit_old_onu_sn').val('');
-        $('#edit_onu').prop('readonly', false).removeClass('bg-light');
-        $('#btnToggleReplaceOnu').html('<i class="bi bi-arrow-repeat"></i> Replace')
-            .removeClass('btn-outline-danger')
+    function resetAssignOnuState() {
+        $('#assignOnuContainer').addClass('d-none');
+        $('#edit_assign_technician_id').val('');
+        $('#edit_assign_onu_note').val('');
+        $('#activeAssignmentAlert').addClass('d-none');
+        $('#btnToggleAssignOnu').html('<i class="bi bi-person-gear"></i> Change ONU')
+            .removeClass('btn-outline-danger btn-outline-warning btn-outline-success')
             .addClass('btn-outline-primary');
-        $('#replaceOnuContainer').addClass('d-none');
-        $('#edit_new_onu_sn').html('<option value="">Select available ONU...</option>');
     }
 
-    function loadAvailableOnus() {
-        var select = $('#edit_new_onu_sn');
-        select.html('<option value="">Loading available ONUs...</option>').prop('disabled', true);
-        $.get('../ajax/get_available_onus.php', function(res) {
+    function loadTechnicians(selectedId) {
+        var select = $('#edit_assign_technician_id');
+        select.html('<option value="">Loading technicians...</option>').prop('disabled', true);
+        $.get('../ajax/get_technicians.php', function(res) {
             select.prop('disabled', false);
             if (res.status === 'success' && res.data && res.data.length > 0) {
-                var html = '<option value="">-- Select New ONU from Store (' + res.data.length + ' available) --</option>';
+                var html = '<option value="">-- Select Technician (' + res.data.length + ') --</option>';
                 res.data.forEach(function(item) {
-                    html += '<option value="' + item.barcode_id + '">' + item.item_name + ' (SN: ' + item.barcode_id + ')</option>';
+                    html += '<option value="' + item.id + '"' + (selectedId && selectedId == item.id ? ' selected' : '') + '>' + item.display + '</option>';
                 });
                 select.html(html);
-                $('#storeOnuCountBadge').text(res.data.length + ' available').removeClass('bg-danger text-white').addClass('bg-white text-success border-success');
+                $('#techCountBadge').text(res.data.length + ' active').removeClass('bg-danger text-white').addClass('bg-white text-success border-success');
             } else {
-                select.html('<option value="">No available ONUs in store</option>');
-                $('#storeOnuCountBadge').text('0 available').removeClass('bg-white text-success border-success').addClass('bg-danger text-white');
+                select.html('<option value="">No active technicians found</option>');
+                $('#techCountBadge').text('0 active').removeClass('bg-white text-success border-success').addClass('bg-danger text-white');
             }
         }).fail(function() {
-            select.prop('disabled', false).html('<option value="">Failed to load ONUs</option>');
-            $('#storeOnuCountBadge').text('Error').addClass('bg-danger text-white');
+            select.prop('disabled', false).html('<option value="">Failed to load technicians</option>');
+            $('#techCountBadge').text('Error').addClass('bg-danger text-white');
         });
     }
 
-    $(document).on('click', '#btnToggleReplaceOnu', function() {
-        var isReplaced = $('#edit_is_onu_replaced').val() === '1';
-        if (!isReplaced) {
-            $('#edit_is_onu_replaced').val('1');
-            var curOnu = $('#edit_onu').val().trim();
-            $('#edit_old_onu_sn').val(curOnu);
-            $('#edit_onu').prop('readonly', true).addClass('bg-light');
+    $(document).on('click', '#btnToggleAssignOnu', function() {
+        var isVisible = !$('#assignOnuContainer').hasClass('d-none');
+        if (!isVisible) {
+            $('#assignOnuContainer').removeClass('d-none');
             $(this).html('<i class="bi bi-x-circle"></i> Cancel')
-                .removeClass('btn-outline-primary')
+                .removeClass('btn-outline-primary btn-outline-warning btn-outline-success')
                 .addClass('btn-outline-danger');
-            $('#replaceOnuContainer').removeClass('d-none');
-            loadAvailableOnus();
+            loadTechnicians();
         } else {
-            resetOnuReplaceState();
+            $('#assignOnuContainer').addClass('d-none');
+            $(this).html('<i class="bi bi-person-gear"></i> Change ONU')
+                .removeClass('btn-outline-danger btn-outline-warning btn-outline-success')
+                .addClass('btn-outline-primary');
         }
     });
 
+    $(document).on('click', '#btnConfirmAssignOnu', function() {
+        var custId = $('#edit_customer_id').val();
+        var techId = $('#edit_assign_technician_id').val();
+        var note = $('#edit_assign_onu_note').val();
+        if (!techId) {
+            showToast('error', 'Please select a technician to assign.');
+            $('#edit_assign_technician_id').focus();
+            return;
+        }
+        var $btn = $(this);
+        var origHtml = $btn.html();
+        $btn.html('<span class="spinner-border spinner-border-sm"></span> Assigning...').prop('disabled', true);
+
+        $.post('../ajax/assign_onu_change.php', {
+            customer_id: custId,
+            technician_id: techId,
+            note: note
+        }, function(res) {
+            $btn.html(origHtml).prop('disabled', false);
+            if (res.status === 'success') {
+                showToast('success', res.message);
+                $('#activeAssignmentText').text('Assigned to ' + res.technician_name + ' (Pending)');
+                $('#activeAssignmentAlert').removeClass('d-none');
+                $('#btnToggleAssignOnu').html('<i class="bi bi-person-check"></i> Assigned')
+                    .removeClass('btn-outline-primary btn-outline-danger btn-outline-warning')
+                    .addClass('btn-outline-success');
+                setTimeout(function() {
+                    $('#assignOnuContainer').addClass('d-none');
+                }, 1200);
+                if (typeof table !== 'undefined' && table.ajax) {
+                    table.ajax.reload(null, false);
+                }
+            } else {
+                showToast('error', res.message);
+            }
+        }, 'json').fail(function() {
+            $btn.html(origHtml).prop('disabled', false);
+            showToast('error', 'Server error while assigning technician.');
+        });
+    });
+
     $('#editCustomerModal').on('hidden.bs.modal', function() {
-        resetOnuReplaceState();
+        resetAssignOnuState();
     });
 
     function fetchAndOpenEditModal(customerId) {
-        resetOnuReplaceState();
+        resetAssignOnuState();
         $.get('../ajax/get_customer.php?id=' + customerId, function(res) {
             if (res.status === 'success') {
                 var data = res.data;
@@ -2610,6 +2658,19 @@ table.on('draw', function() {
                 $('#edit_phone').val(data.phone);
                 $('#edit_email').val(data.email);
                 $('#edit_onu').val(data.onu_sn);
+
+                if (data.pending_onu_change) {
+                    $('#activeAssignmentText').text('Assigned to ' + data.pending_onu_change.technician_name + ' (Pending)');
+                    $('#activeAssignmentAlert').removeClass('d-none');
+                    $('#btnToggleAssignOnu').html('<i class="bi bi-clock-history"></i> Reassign')
+                        .removeClass('btn-outline-primary')
+                        .addClass('btn-outline-warning');
+                } else {
+                    $('#activeAssignmentAlert').addClass('d-none');
+                    $('#btnToggleAssignOnu').html('<i class="bi bi-person-gear"></i> Change ONU')
+                        .removeClass('btn-outline-warning btn-outline-danger btn-outline-success')
+                        .addClass('btn-outline-primary');
+                }
                 $('#edit_area').val(data.area_id);
                 
                 // Load subareas

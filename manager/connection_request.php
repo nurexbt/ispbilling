@@ -95,7 +95,12 @@ if ($hosts_result && $hosts_result->num_rows > 0) {
                         <tr>
                             <td class="text-slate-500" style="font-size: 11px; padding: 12px 16px;"><?= $i++ ?></td>
                             <td style="padding: 12px 16px;">
-                                <div class="text-slate-900 mb-1" style="font-size: 13px; font-weight: 500;"><?= htmlspecialchars($row['name']) ?></div>
+                                <div class="text-slate-900 mb-1 d-flex align-items-center gap-1.5 flex-wrap" style="font-size: 13px; font-weight: 500;">
+                                    <span><?= htmlspecialchars($row['name']) ?></span>
+                                    <?php if (($row['request_type'] ?? '') === 'onu_change'): ?>
+                                        <span class="badge bg-warning text-dark border border-warning-subtle" style="font-size: 9.5px; font-weight: 600;"><i class="bi bi-arrow-repeat me-1"></i>ONU Change</span>
+                                    <?php endif; ?>
+                                </div>
                                 <div class="text-slate-500" style="font-size: 11px;"><?= htmlspecialchars($row['created_at']) ?></div>
                             </td>
                             <td style="padding: 12px 16px;">
@@ -152,7 +157,9 @@ if ($hosts_result && $hosts_result->num_rows > 0) {
                                     <?php if (has_permission('connection_request_assign')): ?>
                                     <button class="btn-action btn-action-blue btn-assign-request" style="width: 24px; height: 24px;" title="Assign To" data-id="<?= $row['id'] ?>"><i class="bi bi-person-lines-fill"></i></button>
                                     <?php endif; ?>
-                                    <?php if (has_permission('connection_request_add_client') && $row['status'] !== 'Service created'): ?>
+                                    <?php if (($row['request_type'] ?? '') === 'onu_change'): ?>
+                                    <a href="customer.php" class="btn-action btn-action-blue" style="width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background-color: #f1f5f9; color: #2563eb;" title="View Customer in Customer List"><i class="bi bi-person-check-fill"></i></a>
+                                    <?php elseif (has_permission('connection_request_add_client') && $row['status'] !== 'Service created'): ?>
                                     <button class="btn-action btn-action-green btn-add-client" style="width: 24px; height: 24px; background-color: #10B981; color: white;" title="Add Client" 
                                         data-id="<?= $row['id'] ?>"
                                         data-name="<?= htmlspecialchars($row['name']) ?>"

@@ -57,9 +57,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old_cust = $old_cust_res->fetch_assoc();
     $stmt->close();
 
+    // Direct change of ONU is restricted: preserve existing customer's ONU unless explicit replacement
+    if (!$is_onu_replaced && isset($old_cust['onu_sn'])) {
+        $onu_sn = $old_cust['onu_sn'];
+    }
+
     if ($is_onu_replaced && empty($old_onu_sn) && !empty($old_cust['onu_sn'])) {
         $old_onu_sn = trim($old_cust['onu_sn']);
     }
+
+    // Optional Assign Technician for ONU Change passed via Edit Customer
+    $assign_tech_id = intval($_POST['assign_technician_id'] ?? 0);
+    $assign_onu_note = trim($_POST['assign_onu_note'] ?? '');
 
     $mikrotik_error = '';
 
@@ -234,10 +243,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // 3. Process Assign Technician for ONU Change if requested
+        $assigned_tech_name = '';
+        if ($assign_tech_id > 0) {
+            $tech_q = $conn->prepare("SELECT full_name FROM employee_tbl WHERE id = ? LIMIT 1");
+            if ($tech_q) {
+                $tech_q->bind_param("i", $assign_tech_id);
+                $tech_q->execute();
+                $tech_r = $tech_q->get_result();
+                if ($tech_row = $tech_r->fetch_assoc()) {
+                    $assigned_tech_name = $tech_row['full_name'];
+                    $current_onu_display = !empty($onu_sn) ? $onu_sn : ($old_cust['onu_sn'] ?: 'None');
+                    $task_note = "ONU Change Request - Current ONU: " . $current_onu_display . ($assign_onu_note ? " (Reason: " . $assign_onu_note . ")" : "");
+                    $c_area = !empty($area_id) ? (int)$area_id : null;
+                    $c_subarea = !empty($subarea_id) ? (int)$subarea_id : null;
+
+                    // Check if pending assignment already exists
+                    $chk_t = $conn->prepare("SELECT id FROM connection_request_tbl WHERE customer_id = ? AND request_type = 'onu_change' AND status = 'Assigned' LIMIT 1");
+                    $chk_t->bind_param("i", $customer_id);
+                    $chk_t->execute();
+                    $chk_r = $chk_t->get_result();
+                    if ($chk_r && $chk_r->num_rows > 0) {
+                        $ex_id = (int)$chk_r->fetch_assoc()['id'];
+                        $chk_t->close();
+                        $up_t = $conn->prepare("UPDATE connection_request_tbl SET assigned_to = ?, note = ? WHERE id = ?");
+                        $up_t->bind_param("isi", $assign_tech_id, $task_note, $ex_id);
+                        $up_t->execute();
+                        $up_t->close();
+                    } else {
+                        $chk_t->close();
+                        $ins_t = $conn->prepare("INSERT INTO connection_request_tbl (name, email, phone, area_id, subarea_id, address, note, pppoe_username, customer_id, request_type, assigned_to, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'onu_change', ?, 'Assigned')");
+                        $ins_t->bind_param("sssiisssii", $name, $email, $phone, $c_area, $c_subarea, $address, $task_note, $username, $customer_id, $assign_tech_id);
+                        $ins_t->execute();
+                        $ins_t->close();
+                    }
+
+                    // Append assignment log to customer's note
+                    $date_str = date('d M Y, h:ia');
+                    $log_line = "[$date_str] Assigned to Technician $assigned_tech_name to change ONU (Current: $current_onu_display" . ($assign_onu_note ? ", Reason: $assign_onu_note" : "") . ") by $action_by";
+                    $conn->query("UPDATE customer_tbl SET note = CONCAT(IFNULL(note, ''), IF(note IS NULL OR note = '', '', '\n'), '" . $conn->real_escape_string($log_line) . "') WHERE id = $customer_id");
+                }
+                $tech_q->close();
+            }
+        }
+
         $conn->commit();
         $msg = 'Customer updated successfully!';
         if ($is_onu_replaced) {
             $msg = 'Customer updated and ONU replaced successfully!';
+        } elseif ($assign_tech_id > 0 && !empty($assigned_tech_name)) {
+            $msg = 'Customer updated and ONU change assigned to technician ' . $assigned_tech_name . '!';
         }
         echo json_encode(['status' => 'success', 'message' => $msg . $mikrotik_error]);
     } catch (Exception $e) {
