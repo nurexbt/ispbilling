@@ -133,7 +133,7 @@ if ($on_hand_result && $on_hand_result->num_rows > 0) {
 
 <!-- Submit ONU SN Modal -->
 <div class="modal fade" id="submitOnuModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
     <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
       <div class="modal-header border-bottom border-slate-100 py-3 px-4">
         <h5 class="modal-title text-slate-800 d-flex align-items-center gap-2" style="font-size: 15px; font-weight: 600;">
@@ -144,19 +144,64 @@ if ($on_hand_result && $on_hand_result->num_rows > 0) {
       <div class="modal-body px-4 py-4">
         <form id="submitOnuForm">
             <input type="hidden" name="request_id" id="onu_request_id">
-            
-            <div class="mb-2">
-                <label class="form-label text-slate-600 mb-1" style="font-size: 13px; font-weight: 500;">Select ONU / Equipment</label>
+            <input type="hidden" name="onu_sn" id="final_onu_sn">
+
+            <!-- ONU Source Selector (Radio Toggle) -->
+            <div class="mb-3">
+                <label class="form-label text-slate-600 mb-1 d-block" style="font-size: 12px; font-weight: 600;">ONU Type / Source</label>
+                <div class="btn-group w-100 p-1 bg-light rounded-3 border border-slate-200" role="group">
+                    <input type="radio" class="btn-check" name="onu_source" id="onu_source_store" value="store" checked autocomplete="off">
+                    <label class="btn btn-sm btn-outline-primary border-0 rounded-2 py-1.5" for="onu_source_store" style="font-size: 12px; font-weight: 500;">
+                        <i class="bi bi-box-seam me-1"></i> From Store
+                    </label>
+
+                    <input type="radio" class="btn-check" name="onu_source" id="onu_source_customer" value="customer_own" autocomplete="off">
+                    <label class="btn btn-sm btn-outline-primary border-0 rounded-2 py-1.5" for="onu_source_customer" style="font-size: 12px; font-weight: 500;">
+                        <i class="bi bi-person-check me-1"></i> Customer Own ONU
+                    </label>
+                </div>
+            </div>
+
+            <!-- Option 1: Select from Store Equipments -->
+            <div id="store_onu_group" class="mb-3">
+                <label class="form-label text-slate-600 mb-1" style="font-size: 12px; font-weight: 500;">Select ONU / Equipment <span class="text-danger">*</span></label>
                 <div class="input-group input-group-sm input-group-rounded">
                     <span class="input-group-text bg-light border-slate-200 text-primary px-3"><i class="bi bi-upc-scan"></i></span>
-                    <select name="onu_sn" class="form-select border-slate-200 shadow-none py-2" required>
+                    <select name="onu_sn_select" id="onu_sn_select" class="form-select border-slate-200 shadow-none py-2" style="font-size: 13px;" required>
                         <option value="" disabled selected>Select from on-hand equipments...</option>
+                        <option value="__customer_own__" style="color: #2563eb; font-weight: 600;">★ Customer Own ONU (Input last 4 digits)</option>
                         <?php foreach($on_hand_items as $eq): ?>
                             <option value="<?= htmlspecialchars($eq['barcode_id']) ?>"><?= htmlspecialchars($eq['item_name']) ?> - <?= htmlspecialchars($eq['barcode_id']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php if (empty($on_hand_items)): ?>
+                <div class="form-text text-muted mt-1" style="font-size: 11px;">
+                    <i class="bi bi-info-circle me-1"></i>No on-hand equipment available. If customer has their own ONU, switch to <strong>Customer Own ONU</strong>.
+                </div>
+                <?php endif; ?>
             </div>
+
+            <!-- Option 2: Customer Own ONU (Manual Last 4 Digits) -->
+            <div id="customer_onu_group" class="mb-3" style="display: none;">
+                <label class="form-label text-slate-600 mb-1" style="font-size: 12px; font-weight: 500;">Customer ONU (Last 4 Digits) <span class="text-danger">*</span></label>
+                <div class="input-group input-group-sm input-group-rounded">
+                    <span class="input-group-text bg-light border-slate-200 text-primary px-3 fw-bold font-monospace" style="font-size: 12px;">Customer-</span>
+                    <input type="text" 
+                           name="customer_onu_last4" 
+                           id="customer_onu_last4" 
+                           class="form-control border-slate-200 shadow-none py-2 font-monospace" 
+                           placeholder="e.g. 4A8F or 1234" 
+                           maxlength="4" 
+                           autocomplete="off"
+                           style="text-transform: uppercase; font-weight: 600; letter-spacing: 2px; font-size: 13px;">
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-1.5 px-1">
+                    <span class="text-slate-400" style="font-size: 11px;">Input customer ONU last 4 digit</span>
+                    <span class="text-slate-500 font-monospace" style="font-size: 11px;">Record: <strong id="customer_onu_preview" class="text-primary fw-bold">Customer-____</strong></span>
+                </div>
+            </div>
+
       </div>
       <div class="modal-footer border-top border-slate-100 py-3 px-4 bg-light" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
         <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm px-3" data-bs-dismiss="modal" style="font-size: 12px; font-weight: 500; color: #475569;">Cancel</button>
@@ -193,13 +238,84 @@ $(document).ready(function() {
         var id = $(this).data('id');
         $('#onu_request_id').val(id);
         $('#submitOnuForm')[0].reset();
+        
+        // Reset to default Store mode
+        setOnuMode('store');
+        
         $('#submitOnuModal').modal('show');
+    });
+
+    // Toggle between Store ONU and Customer Own ONU
+    function setOnuMode(mode) {
+        if (mode === 'customer_own') {
+            $('#onu_source_customer').prop('checked', true);
+            $('#store_onu_group').hide();
+            $('#onu_sn_select').prop('required', false);
+            $('#customer_onu_group').show();
+            $('#customer_onu_last4').prop('required', true).val('').focus();
+            $('#customer_onu_preview').text('Customer-____');
+        } else {
+            $('#onu_source_store').prop('checked', true);
+            $('#store_onu_group').show();
+            $('#onu_sn_select').prop('required', true);
+            if ($('#onu_sn_select').val() === '__customer_own__') {
+                $('#onu_sn_select').val('');
+            }
+            $('#customer_onu_group').hide();
+            $('#customer_onu_last4').prop('required', false).val('');
+        }
+    }
+
+    $('input[name="onu_source"]').on('change', function() {
+        setOnuMode($(this).val());
+    });
+
+    // Also trigger Customer Own ONU if selected from dropdown
+    $('#onu_sn_select').on('change', function() {
+        if ($(this).val() === '__customer_own__') {
+            setOnuMode('customer_own');
+        }
+    });
+
+    // Live uppercase formatting and preview for customer ONU last 4 digits
+    $('#customer_onu_last4').on('input keyup', function() {
+        var val = $(this).val().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        $(this).val(val);
+        $('#customer_onu_preview').text('Customer-' + (val ? val : '____'));
     });
 
     // Handle Submit ONU Form
     $('#submitOnuForm').on('submit', function(e) {
         e.preventDefault();
         
+        var source = $('input[name="onu_source"]:checked').val();
+        var finalOnuSn = '';
+
+        if (source === 'customer_own') {
+            var last4 = $('#customer_onu_last4').val().trim().toUpperCase();
+            if (!last4) {
+                showToast('error', 'Please enter customer ONU last 4 digits.');
+                $('#customer_onu_last4').focus();
+                return;
+            }
+            if (last4.length < 4) {
+                showToast('error', 'Customer ONU must be exactly 4 digits / characters.');
+                $('#customer_onu_last4').focus();
+                return;
+            }
+            finalOnuSn = 'Customer-' + last4;
+        } else {
+            var selected = $('#onu_sn_select').val();
+            if (!selected || selected === '__customer_own__') {
+                showToast('error', 'Please select an ONU from on-hand equipments or switch to Customer Own ONU.');
+                $('#onu_sn_select').focus();
+                return;
+            }
+            finalOnuSn = selected;
+        }
+
+        $('#final_onu_sn').val(finalOnuSn);
+
         var $btn = $(this).find('button[type="submit"]');
         var originalText = $btn.html();
         $btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
@@ -208,7 +324,12 @@ $(document).ready(function() {
         $.ajax({
             url: '../ajax/submit_onu_sn.php',
             type: 'POST',
-            data: $(this).serialize(),
+            data: {
+                request_id: $('#onu_request_id').val(),
+                onu_sn: finalOnuSn,
+                onu_source: source,
+                customer_onu_last4: (source === 'customer_own' ? $('#customer_onu_last4').val().trim().toUpperCase() : '')
+            },
             dataType: 'json',
             success: function(response) {
                 if(response.status === 'success') {

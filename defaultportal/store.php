@@ -48,6 +48,29 @@ if ($employees_result && $employees_result->num_rows > 0) {
 ?>
 
 <div class="container-fluid pt-2">
+
+<style>
+.stepper-wrapper { display: flex; align-items: flex-start; justify-content: space-between; position: relative; width: 100%; min-width: 250px; padding-top: 5px; }
+.step-item { position: relative; display: flex; flex-direction: column; align-items: center; flex: 1; z-index: 2; }
+.step-circle { width: 14px; height: 14px; border-radius: 50%; background-color: #fff; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 3; }
+.step-circle::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background-color: transparent; }
+
+.step-item.completed .step-circle { border-color: #10b981; }
+.step-item.completed .step-circle::after { background-color: #10b981; }
+
+.step-item.error .step-circle { border-color: #ef4444; }
+.step-item.error .step-circle::after { background-color: #ef4444; }
+
+.step-line { position: absolute; top: 6px; left: 50%; width: 100%; height: 2px; background-color: #e2e8f0; z-index: 1; }
+.step-item.completed .step-line { background-color: #10b981; }
+
+.step-label { font-size: 9px; color: #64748b; margin-top: 4px; font-weight: 500; text-align: center; }
+.step-item.completed .step-label { color: #10b981; font-weight: 600; }
+.step-item.error .step-label { color: #ef4444; font-weight: 600; }
+
+.step-time { font-size: 8px; color: #94a3b8; margin-top: 2px; text-align: center; line-height: 1.1; }
+</style>
+
     <!-- Main Card -->
     <div class="dashboard-card p-0 mt-3 border-0" style="box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);">
         
@@ -198,29 +221,7 @@ if ($employees_result && $employees_result->num_rows > 0) {
                                     $t_returned = !empty($row['returned_at']) ? date($time_format, strtotime($row['returned_at'])) : '';
                                     $return_label = !empty($row['return_reason']) ? htmlspecialchars($row['return_reason']) : 'Return';
                                     ?>
-                                    <?php if ($i == 2): // only output style once ?>
-                                    <style>
-                                        .stepper-wrapper { display: flex; align-items: flex-start; justify-content: space-between; position: relative; width: 100%; min-width: 250px; padding-top: 5px; }
-                                        .step-item { position: relative; display: flex; flex-direction: column; align-items: center; flex: 1; z-index: 2; }
-                                        .step-circle { width: 14px; height: 14px; border-radius: 50%; background-color: #fff; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 3; }
-                                        .step-circle::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background-color: transparent; }
-                                        
-                                        .step-item.completed .step-circle { border-color: #10b981; }
-                                        .step-item.completed .step-circle::after { background-color: #10b981; }
-                                        
-                                        .step-item.error .step-circle { border-color: #ef4444; }
-                                        .step-item.error .step-circle::after { background-color: #ef4444; }
-                                        
-                                        .step-line { position: absolute; top: 6px; left: 50%; width: 100%; height: 2px; background-color: #e2e8f0; z-index: 1; }
-                                        .step-item.completed .step-line { background-color: #10b981; }
-                                        
-                                        .step-label { font-size: 9px; color: #64748b; margin-top: 4px; font-weight: 500; text-align: center; }
-                                        .step-item.completed .step-label { color: #10b981; font-weight: 600; }
-                                        .step-item.error .step-label { color: #ef4444; font-weight: 600; }
-                                        
-                                        .step-time { font-size: 8px; color: #94a3b8; margin-top: 2px; text-align: center; line-height: 1.1; }
-                                    </style>
-                                    <?php endif; ?>
+
                                     <div class="stepper-wrapper">
                                         <div class="step-item <?= $s_added ?>">
                                             <div class="step-circle"></div>
