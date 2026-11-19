@@ -2657,8 +2657,12 @@ table.on('draw', function() {
                 
                 $('#editCustomerModal').modal('show');
             } else {
-                showToast('error', res.message);
+                showToast('error', res.message || 'Failed to load customer details');
             }
+        }).fail(function(xhr) {
+            console.error('get_customer AJAX error:', xhr);
+            var errMsg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : ('Server error: ' + xhr.status + ' ' + xhr.statusText);
+            showToast('error', errMsg);
         });
     }
 
