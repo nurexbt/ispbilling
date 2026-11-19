@@ -14,29 +14,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['store_id'])) {
     $store_id = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
     $employee_name = get_current_user_name($conn);
 
-    // Verify it is in Warranty
-    $check_query = "SELECT return_reason FROM store_tbl WHERE id = ?";
+    // Verify return reason is Warranty or Replace
+    $check_query = "SELECT return_reason, barcode_id FROM store_tbl WHERE id = ?";
     $stmt = $conn->prepare($check_query);
     $stmt->bind_param("i", $store_id);
     $stmt->execute();
     $result = $stmt->get_result();
     
     if ($row = $result->fetch_assoc()) {
-        if ($row['return_reason'] !== 'Warranty') {
-            echo json_encode(['status' => 'error', 'message' => 'Only items returned for Warranty can be re-added directly.']);
+        $reason = $row['return_reason'] ?? '';
+        if ($reason !== 'Warranty' && $reason !== 'Replace') {
+            echo json_encode(['status' => 'error', 'message' => 'Only items returned for Warranty or Replace can be re-added to store.']);
             exit;
         }
         
         $conn->begin_transaction();
         
         try {
-            // Update the store item back to available
+            // Update the store item back to available In Stock
             $update_query = "UPDATE store_tbl SET 
                                 delivery_status = 'pending', 
                                 delivered_to = NULL, 
                                 return_reason = NULL, 
+                                replace_new_id = NULL,
                                 delivered_at = NULL, 
-                                approved_at = NULL, 
+                                approved_at = NOW(), 
                                 used_at = NULL, 
                                 returned_at = NULL 
                              WHERE id = ?";
@@ -48,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['store_id'])) {
             
             // Insert history log
             $action = 'Re-Added';
-            $description = 'Re-Added to available store from Warranty state.';
+            $description = 'Approved by ' . $employee_name . ' and re-added to available store stock from ' . $reason . ' state.';
             $history_query = "INSERT INTO store_item_history_tbl (store_id, action, description, action_by) VALUES (?, ?, ?, ?)";
             $hist_stmt = $conn->prepare($history_query);
             $hist_stmt->bind_param("isss", $store_id, $action, $description, $employee_name);

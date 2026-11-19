@@ -122,7 +122,15 @@ if ($on_hand_result && $on_hand_result->num_rows > 0) {
                             <td class="text-end" style="padding: 12px 16px;">
                                 <?php if ($row['status'] == 'Assigned'): ?>
                                     <div class="d-flex justify-content-end gap-1">
-                                        <button class="btn-action btn-action-green btn-submit-onu" style="width: 26px; height: 26px; border-radius: 4px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" title="Submit ONU" data-id="<?= $row['id'] ?>"><i class="bi bi-check2-circle" style="font-size: 14px;"></i></button>
+                                        <button class="btn-action btn-action-green btn-submit-onu" 
+                                                style="width: 26px; height: 26px; border-radius: 4px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" 
+                                                title="Submit ONU" 
+                                                data-id="<?= $row['id'] ?>"
+                                                data-request-type="<?= htmlspecialchars($row['request_type'] ?? 'new_connection') ?>"
+                                                data-customer-id="<?= (int)($row['customer_id'] ?? 0) ?>"
+                                                data-applicant="<?= htmlspecialchars($row['name'] ?? '') ?>">
+                                            <i class="bi bi-check2-circle" style="font-size: 14px;"></i>
+                                        </button>
                                     </div>
                                 <?php else: ?>
                                     <span class="text-slate-300">-</span>
@@ -207,6 +215,38 @@ if ($on_hand_result && $on_hand_result->num_rows > 0) {
                 </div>
             </div>
 
+            <!-- Option 3: Return Old ONU to Store (Shown on ONU Change tasks) -->
+            <div id="onu_return_container" class="p-3 mb-2 rounded-3 border" style="background-color: #f8fafc; border-color: #e2e8f0; display: none;">
+                <div class="d-flex align-items-center justify-content-between mb-1.5">
+                    <span class="text-slate-800 fw-semibold d-flex align-items-center gap-1.5" style="font-size: 12px;">
+                        <i class="bi bi-arrow-return-left text-warning"></i> Old ONU Return to Store
+                    </span>
+                    <span class="badge bg-warning text-dark border border-warning-subtle" style="font-size: 9.5px; font-weight: 600;">Needs Manager Approval</span>
+                </div>
+                
+                <div class="form-check form-switch mt-2 mb-2">
+                    <input class="form-check-input" type="checkbox" name="return_old_onu" id="return_old_onu" value="1" checked style="cursor: pointer;">
+                    <label class="form-check-label text-slate-700 fw-medium" for="return_old_onu" style="font-size: 12px; cursor: pointer;">
+                        Return old ONU to Store
+                    </label>
+                </div>
+                
+                <div id="return_condition_box">
+                    <label class="form-label text-slate-600 mb-1" style="font-size: 11.5px; font-weight: 500;">Returned ONU Condition</label>
+                    <select name="return_condition" id="return_condition" class="form-select form-select-sm border-slate-200 shadow-none text-slate-700" style="font-size: 12px;">
+                        <option value="Replace" selected>Working / Replaced (For Store Inspection)</option>
+                        <option value="Damage">Damage / Defective</option>
+                        <option value="Warranty">Warranty Claim</option>
+                    </select>
+                    <div class="text-slate-400 mt-1" style="font-size: 10.5px;">
+                        <i class="bi bi-shield-check me-1"></i>Before this ONU is added back to store inventory, it must be approved by the <strong>Manager</strong>.
+                    </div>
+                </div>
+                <div id="return_not_returned_hint" class="text-muted mt-1" style="font-size: 11px; display: none;">
+                    <i class="bi bi-info-circle me-1"></i>Old ONU will not be returned to store (kept by customer or not retrieved).
+                </div>
+            </div>
+
       </div>
       <div class="modal-footer border-top border-slate-100 py-3 px-4 bg-light" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
         <button type="button" class="btn btn-sm btn-white border-slate-200 shadow-sm px-3" data-bs-dismiss="modal" style="font-size: 12px; font-weight: 500; color: #475569;">Cancel</button>
@@ -241,13 +281,35 @@ $(document).ready(function() {
     // Open Submit Modal
     $(document).on('click', '.btn-submit-onu', function() {
         var id = $(this).data('id');
+        var reqType = $(this).data('request-type') || '';
         $('#onu_request_id').val(id);
         $('#submitOnuForm')[0].reset();
         
         // Reset to default Store mode
         setOnuMode('store');
+
+        // Toggle Old ONU Return section based on request type
+        if (reqType === 'onu_change') {
+            $('#onu_return_container').show();
+            $('#return_old_onu').prop('checked', true);
+            $('#return_condition_box').show();
+            $('#return_not_returned_hint').hide();
+        } else {
+            $('#onu_return_container').hide();
+            $('#return_old_onu').prop('checked', false);
+        }
         
         $('#submitOnuModal').modal('show');
+    });
+
+    $('#return_old_onu').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#return_condition_box').slideDown(150);
+            $('#return_not_returned_hint').hide();
+        } else {
+            $('#return_condition_box').slideUp(150);
+            $('#return_not_returned_hint').show();
+        }
     });
 
     // Toggle between Store ONU and Customer Own ONU
@@ -333,7 +395,9 @@ $(document).ready(function() {
                 request_id: $('#onu_request_id').val(),
                 onu_sn: finalOnuSn,
                 onu_source: source,
-                customer_onu_last4: (source === 'customer_own' ? $('#customer_onu_last4').val().trim().toUpperCase() : '')
+                customer_onu_last4: (source === 'customer_own' ? $('#customer_onu_last4').val().trim().toUpperCase() : ''),
+                return_old_onu: $('#return_old_onu').is(':checked') ? 1 : 0,
+                return_condition: $('#return_condition').val() || 'Replace'
             },
             dataType: 'json',
             success: function(response) {

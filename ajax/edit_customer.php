@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($old_row = $res_old->fetch_assoc()) {
                         $old_store_id = (int)$old_row['id'];
 
-                        $up_old = $conn->prepare("UPDATE store_tbl SET delivered_to = NULL, delivery_status = 'pending', return_reason = 'Replace', replace_new_id = ?, returned_at = NOW() WHERE id = ?");
+                        $up_old = $conn->prepare("UPDATE store_tbl SET delivered_to = NULL, delivery_status = 'pending', return_reason = 'Replace', replace_new_id = ?, returned_at = NOW(), approved_at = NULL WHERE id = ?");
                         if ($up_old) {
                             $up_old->bind_param("si", $new_onu_sn, $old_store_id);
                             $up_old->execute();

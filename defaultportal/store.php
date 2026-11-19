@@ -193,6 +193,8 @@ if ($employees_result && $employees_result->num_rows > 0) {
                                         <span class="badge bg-light text-primary border border-primary-subtle rounded-pill px-3 py-1" style="font-weight: 600; font-size: 11px;"><?= htmlspecialchars($row['item_name']) ?></span>
                                         <?php if ($is_in_stock): ?>
                                             <span class="badge bg-success text-white" style="font-size: 9px;"><i class="bi bi-check-circle me-1"></i>In Stock</span>
+                                        <?php elseif (!empty($row['return_reason']) && $row['return_reason'] === 'Replace'): ?>
+                                            <span class="badge bg-warning text-dark border border-warning-subtle" style="font-size: 9px;"><i class="bi bi-clock-history me-1"></i>Needs Approval</span>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -268,9 +270,15 @@ if ($employees_result && $employees_result->num_rows > 0) {
                                                 <i class="bi bi-person-check" style="font-size: 12px;"></i>
                                             </button>
                                         <?php endif; ?>
-                                        <?php if (isset($row['return_reason']) && $row['return_reason'] === 'Warranty'): ?>
-                                            <button class="btn-action bg-success text-white border-0 btn-readd-store d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; border-radius: 4px;" title="Re-Add to Store" data-id="<?= $row['id'] ?>">
-                                                <i class="bi bi-arrow-repeat" style="font-size: 12px;"></i>
+                                        <?php if (!empty($row['return_reason']) && in_array($row['return_reason'], ['Replace', 'Warranty'])): ?>
+                                            <button class="btn-action bg-success text-white border-0 btn-approve-return d-flex align-items-center justify-content-center" 
+                                                    style="width: 24px; height: 24px; border-radius: 4px;" 
+                                                    title="Manager Approval: Add to Store Stock" 
+                                                    data-id="<?= $row['id'] ?>" 
+                                                    data-barcode="<?= htmlspecialchars($row['barcode_id']) ?>"
+                                                    data-reason="<?= htmlspecialchars($row['return_reason']) ?>"
+                                                    data-replace="<?= htmlspecialchars($row['replace_new_id'] ?? '') ?>">
+                                                <i class="bi bi-check2-circle" style="font-size: 13px;"></i>
                                             </button>
                                         <?php endif; ?>
                                         <button class="btn-action btn-action-red btn-delete-store" style="width: 24px; height: 24px; border-radius: 4px;" title="Delete" data-id="<?= $row['id'] ?>">
@@ -726,6 +734,92 @@ $(document).ready(function() {
                         } else {
                             showToast('error', response.message);
                         }
+                    }
+                });
+            }
+        });
+    });
+
+    // Manager Approval for Returned Equipment
+    $(document).on('click', '.btn-approve-return', function() {
+        var id = $(this).data('id');
+        var barcode = $(this).data('barcode');
+        var reason = $(this).data('reason') || 'Replace';
+        var replaceWith = $(this).data('replace') || '';
+
+        var infoHtml = '<div class="text-start" style="font-size: 13px;">' +
+            '<div class="mb-2"><strong>Item Barcode:</strong> <span class="badge bg-light text-dark border font-monospace px-2 py-1">' + barcode + '</span></div>' +
+            (replaceWith ? '<div class="mb-2"><strong>Replaced with:</strong> <span class="badge bg-light text-primary border font-monospace px-2 py-1">' + replaceWith + '</span></div>' : '') +
+            '<div class="mb-3"><strong>Return Status:</strong> <span class="badge bg-warning text-dark border border-warning-subtle px-2 py-1">' + reason + ' (Pending Approval)</span></div>' +
+            '<label class="form-label fw-semibold text-slate-700 mb-1">Select Approval Action:</label>' +
+            '<div class="p-2.5 bg-light rounded-3 border mb-2">' +
+                '<div class="form-check mb-2">' +
+                    '<input class="form-check-input" type="radio" name="swal_action_type" id="act_approve" value="approve_to_stock" checked style="cursor: pointer;">' +
+                    '<label class="form-check-label fw-semibold text-success" for="act_approve" style="cursor: pointer;">' +
+                        '<i class="bi bi-box-seam me-1"></i> Approve & Add to Store (In Stock)' +
+                    '</label>' +
+                    '<div class="text-slate-500 small ms-4" style="font-size: 11px;">Item is verified working and ready for assignment/use.</div>' +
+                '</div>' +
+                '<div class="form-check mb-2">' +
+                    '<input class="form-check-input" type="radio" name="swal_action_type" id="act_damage" value="mark_damaged" style="cursor: pointer;">' +
+                    '<label class="form-check-label fw-semibold text-danger" for="act_damage" style="cursor: pointer;">' +
+                        '<i class="bi bi-x-circle me-1"></i> Mark as Damaged' +
+                    '</label>' +
+                    '<div class="text-slate-500 small ms-4" style="font-size: 11px;">Item is broken/defective and cannot be re-used.</div>' +
+                '</div>' +
+                '<div class="form-check">' +
+                    '<input class="form-check-input" type="radio" name="swal_action_type" id="act_warranty" value="mark_warranty" style="cursor: pointer;">' +
+                    '<label class="form-check-label fw-semibold text-warning" for="act_warranty" style="cursor: pointer;">' +
+                        '<i class="bi bi-shield-exclamation me-1"></i> Send to Warranty' +
+                    '</label>' +
+                    '<div class="text-slate-500 small ms-4" style="font-size: 11px;">Item will be sent for warranty claim.</div>' +
+                '</div>' +
+            '</div>' +
+            '<label class="form-label fw-semibold text-slate-700 mb-1">Approval Note (Optional):</label>' +
+            '<input type="text" id="swal_approval_note" class="form-control form-control-sm border-slate-200 shadow-none" placeholder="e.g. Tested working, added to stock">' +
+        '</div>';
+
+        Swal.fire({
+            title: 'Manager Approval',
+            html: infoHtml,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-check2"></i> Confirm',
+            cancelButtonText: 'Cancel',
+            customClass: {
+                popup: 'compact-swal-popup',
+                title: 'compact-swal-title',
+                confirmButton: 'btn btn-sm btn-success px-4',
+                cancelButton: 'btn btn-sm btn-secondary px-3 ms-2'
+            },
+            buttonsStyling: false,
+            preConfirm: () => {
+                var actionType = $('input[name="swal_action_type"]:checked').val() || 'approve_to_stock';
+                var note = $('#swal_approval_note').val().trim();
+                return { actionType: actionType, note: note };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                var data = result.value;
+                $.ajax({
+                    url: '../ajax/approve_store_return.php',
+                    type: 'POST',
+                    data: {
+                        store_id: id,
+                        action_type: data.actionType,
+                        note: data.note
+                    },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            showToast('success', res.message);
+                            setTimeout(function(){ location.reload(); }, 800);
+                        } else {
+                            showToast('error', res.message);
+                        }
+                    },
+                    error: function() {
+                        showToast('error', 'Server error while approving return.');
                     }
                 });
             }
