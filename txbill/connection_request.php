@@ -409,8 +409,9 @@ $(document).ready(function() {
                     showToast('error', response.message);
                 }
             },
-            error: function() {
-                showToast('error', 'An error occurred while submitting.');
+            error: function(xhr) {
+                var errMsg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : ('Server error: ' + (xhr.status ? (xhr.status + ' ' + xhr.statusText) : 'Failed to communicate with server'));
+                showToast('error', errMsg);
             },
             complete: function() {
                 $btn.html(originalText);

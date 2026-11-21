@@ -177,9 +177,10 @@ if ($current_script == 'index.php') {
     }
 }
 
-// Auto-check and ensure connection_request_tbl has customer_id & request_type columns (e.g. on new server deploy)
-if (isset($conn) && $conn instanceof mysqli && empty($_SESSION['__cr_cols_verified'])) {
+// Auto-check and ensure all required schema columns exist across tables (zero downtime on server deploy)
+if (isset($conn) && $conn instanceof mysqli && empty($_SESSION['__schema_verified_v2'])) {
     try {
+        // connection_request_tbl
         $chk_cr = $conn->query("SHOW COLUMNS FROM connection_request_tbl LIKE 'customer_id'");
         if ($chk_cr && $chk_cr->num_rows === 0) {
             @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN customer_id INT(11) DEFAULT NULL AFTER pppoe_username");
@@ -188,8 +189,50 @@ if (isset($conn) && $conn instanceof mysqli && empty($_SESSION['__cr_cols_verifi
         if ($chk_rt && $chk_rt->num_rows === 0) {
             @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN request_type VARCHAR(50) DEFAULT 'new_connection' AFTER customer_id");
         }
+        $chk_os = $conn->query("SHOW COLUMNS FROM connection_request_tbl LIKE 'onu_submitted_by'");
+        if ($chk_os && $chk_os->num_rows === 0) {
+            @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN onu_submitted_by VARCHAR(100) DEFAULT NULL AFTER onu_sn");
+        }
+        $chk_pu = $conn->query("SHOW COLUMNS FROM connection_request_tbl LIKE 'pppoe_username'");
+        if ($chk_pu && $chk_pu->num_rows === 0) {
+            @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN pppoe_username VARCHAR(100) DEFAULT NULL AFTER onu_sn");
+        }
+
+        // customer_tbl
+        $chk_cos = $conn->query("SHOW COLUMNS FROM customer_tbl LIKE 'onu_submitted_by'");
+        if ($chk_cos && $chk_cos->num_rows === 0) {
+            @$conn->query("ALTER TABLE customer_tbl ADD COLUMN onu_submitted_by VARCHAR(100) DEFAULT NULL AFTER onu_sn");
+        }
+
+        // store_tbl
+        $chk_rr = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'return_reason'");
+        if ($chk_rr && $chk_rr->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN return_reason VARCHAR(255) DEFAULT NULL");
+        }
+        $chk_rn = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'replace_new_id'");
+        if ($chk_rn && $chk_rn->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN replace_new_id VARCHAR(100) DEFAULT NULL");
+        }
+        $chk_da = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'delivered_at'");
+        if ($chk_da && $chk_da->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN delivered_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $chk_aa = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'approved_at'");
+        if ($chk_aa && $chk_aa->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN approved_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $chk_ua = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'used_at'");
+        if ($chk_ua && $chk_ua->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN used_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $chk_ra = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'returned_at'");
+        if ($chk_ra && $chk_ra->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN returned_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        @$conn->query("ALTER TABLE store_tbl MODIFY COLUMN delivery_status ENUM('pending','accepted','rejected','used') DEFAULT 'pending'");
+
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION['__cr_cols_verified'] = true;
+            $_SESSION['__schema_verified_v2'] = true;
         }
     } catch (Throwable $e) {
         // Suppress to ensure requests continue smoothly

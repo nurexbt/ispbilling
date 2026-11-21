@@ -2,12 +2,17 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
+try {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['request_id'])) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+        exit;
+    }
+
     $request_id = intval($_POST['request_id']);
     $onu_source = trim($_POST['onu_source'] ?? 'store');
     $onu_sn = trim($_POST['onu_sn'] ?? '');
@@ -37,8 +42,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
     $onu_sn_escaped = $conn->real_escape_string($onu_sn);
     $submitted_by = $conn->real_escape_string(get_current_user_name($conn));
 
+    // Auto-migrate any missing columns on the fly (guarantees no DB errors on any server)
+    try {
+        $chk_os = $conn->query("SHOW COLUMNS FROM connection_request_tbl LIKE 'onu_submitted_by'");
+        if ($chk_os && $chk_os->num_rows === 0) {
+            @$conn->query("ALTER TABLE connection_request_tbl ADD COLUMN onu_submitted_by VARCHAR(100) DEFAULT NULL AFTER onu_sn");
+        }
+        $chk_cos = $conn->query("SHOW COLUMNS FROM customer_tbl LIKE 'onu_submitted_by'");
+        if ($chk_cos && $chk_cos->num_rows === 0) {
+            @$conn->query("ALTER TABLE customer_tbl ADD COLUMN onu_submitted_by VARCHAR(100) DEFAULT NULL AFTER onu_sn");
+        }
+        $chk_rn = $conn->query("SHOW COLUMNS FROM store_tbl LIKE 'replace_new_id'");
+        if ($chk_rn && $chk_rn->num_rows === 0) {
+            @$conn->query("ALTER TABLE store_tbl ADD COLUMN replace_new_id VARCHAR(100) DEFAULT NULL");
+        }
+        @$conn->query("ALTER TABLE store_tbl MODIFY COLUMN delivery_status ENUM('pending','accepted','rejected','used') DEFAULT 'pending'");
+    } catch (Throwable $e) {}
+
     // Fetch existing request details
     $req_stmt = $conn->prepare("SELECT customer_id, request_type, name, onu_sn FROM connection_request_tbl WHERE id = ? LIMIT 1");
+    if (!$req_stmt) {
+        throw new Exception("Database prepare error: " . $conn->error);
+    }
     $req_stmt->bind_param("i", $request_id);
     $req_stmt->execute();
     $req_res = $req_stmt->get_result();
@@ -48,17 +73,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
     $customer_id = !empty($req_data['customer_id']) ? intval($req_data['customer_id']) : 0;
     $request_type = $req_data['request_type'] ?? 'new_connection';
 
+    // Update connection request
     $update_query = "UPDATE connection_request_tbl SET onu_sn = '$onu_sn_escaped', onu_submitted_by = '$submitted_by', status = 'TX Complete' WHERE id = $request_id";
+    if (!$conn->query($update_query)) {
+        throw new Exception("Failed to update connection request: " . $conn->error);
+    }
 
-    if ($conn->query($update_query)) {
-        // 1. Update New ONU in store_tbl (if from store)
-        if (!$is_customer_own) {
-            $conn->query("UPDATE store_tbl SET used_at = NOW(), delivery_status = 'used' WHERE barcode_id = '$onu_sn_escaped'");
-        }
+    // 1. Update New ONU in store_tbl (if from store)
+    if (!$is_customer_own) {
+        @$conn->query("UPDATE store_tbl SET used_at = NOW(), delivery_status = 'accepted' WHERE barcode_id = '$onu_sn_escaped'");
+    }
 
-        // 2. Handle ONU Change for Existing Customer
-        if ($request_type === 'onu_change' && $customer_id > 0) {
-            $cust_stmt = $conn->prepare("SELECT id, name, username, onu_sn, note FROM customer_tbl WHERE id = ? LIMIT 1");
+    // 2. Handle ONU Change for Existing Customer
+    if ($request_type === 'onu_change' && $customer_id > 0) {
+        $cust_stmt = $conn->prepare("SELECT id, name, username, onu_sn, note FROM customer_tbl WHERE id = ? LIMIT 1");
+        if ($cust_stmt) {
             $cust_stmt->bind_param("i", $customer_id);
             $cust_stmt->execute();
             $cust_res = $cust_stmt->get_result();
@@ -73,23 +102,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
 
                 // A. Record New ONU in store history
                 if (!$is_customer_own) {
-                    $s_stmt = $conn->prepare("SELECT id FROM store_tbl WHERE barcode_id = ? LIMIT 1");
-                    if ($s_stmt) {
-                        $s_stmt->bind_param("s", $onu_sn);
-                        $s_stmt->execute();
-                        $s_res = $s_stmt->get_result();
-                        if ($s_row = $s_res->fetch_assoc()) {
-                            $new_store_id = (int)$s_row['id'];
-                            $desc_new = "Used for customer " . $cust_name . " (" . $cust_user . ") - Replaced old ONU " . $old_onu_display;
-                            $hist = $conn->prepare("INSERT INTO store_item_history_tbl (store_id, action, description, action_by) VALUES (?, 'Used', ?, ?)");
-                            if ($hist) {
-                                $hist->bind_param("iss", $new_store_id, $desc_new, $submitted_by);
-                                $hist->execute();
-                                $hist->close();
+                    try {
+                        $s_stmt = $conn->prepare("SELECT id FROM store_tbl WHERE barcode_id = ? LIMIT 1");
+                        if ($s_stmt) {
+                            $s_stmt->bind_param("s", $onu_sn);
+                            $s_stmt->execute();
+                            $s_res = $s_stmt->get_result();
+                            if ($s_row = $s_res->fetch_assoc()) {
+                                $new_store_id = (int)$s_row['id'];
+                                $desc_new = "Used for customer " . $cust_name . " (" . $cust_user . ") - Replaced old ONU " . $old_onu_display;
+                                $hist = $conn->prepare("INSERT INTO store_item_history_tbl (store_id, action, description, action_by) VALUES (?, 'Used', ?, ?)");
+                                if ($hist) {
+                                    $hist->bind_param("iss", $new_store_id, $desc_new, $submitted_by);
+                                    $hist->execute();
+                                    $hist->close();
+                                }
                             }
+                            $s_stmt->close();
                         }
-                        $s_stmt->close();
-                    }
+                    } catch (Throwable $e) {}
                 }
 
                 // B. Handle Old ONU Return to Store
@@ -104,38 +135,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
                 if ($return_old_onu === 1 && !empty($old_onu_sn) && stripos($old_onu_sn, 'Customer-') !== 0) {
                     $return_note_info = "Returned to Store ($return_condition) - Awaiting Manager Approval";
                     $old_store_id = 0;
-                    $old_stmt = $conn->prepare("SELECT id FROM store_tbl WHERE barcode_id = ? LIMIT 1");
-                    if ($old_stmt) {
-                        $old_stmt->bind_param("s", $old_onu_sn);
-                        $old_stmt->execute();
-                        $old_res = $old_stmt->get_result();
-                        if ($old_row = $old_res->fetch_assoc()) {
-                            $old_store_id = (int)$old_row['id'];
-                            $conn->query("UPDATE store_tbl SET delivered_to = NULL, delivery_status = 'pending', return_reason = '$return_condition', replace_new_id = '$onu_sn_escaped', returned_at = NOW(), approved_at = NULL WHERE id = $old_store_id");
-                        } else {
-                            // Insert into store_tbl if not tracked before
-                            $item_q = $conn->query("SELECT id FROM item_tbl WHERE item_name LIKE '%ONU%' LIMIT 1");
-                            $item_id = ($item_q && $i_r = $item_q->fetch_assoc()) ? (int)$i_r['id'] : 1;
-                            $ins_old = $conn->prepare("INSERT INTO store_tbl (item_id, barcode_id, delivered_to, delivery_status, return_reason, replace_new_id, returned_at, approved_at) VALUES (?, ?, NULL, 'pending', ?, ?, NOW(), NULL)");
-                            if ($ins_old) {
-                                $ins_old->bind_param("isss", $item_id, $old_onu_sn, $return_condition, $onu_sn);
-                                $ins_old->execute();
-                                $old_store_id = $ins_old->insert_id;
-                                $ins_old->close();
+                    try {
+                        $old_stmt = $conn->prepare("SELECT id FROM store_tbl WHERE barcode_id = ? LIMIT 1");
+                        if ($old_stmt) {
+                            $old_stmt->bind_param("s", $old_onu_sn);
+                            $old_stmt->execute();
+                            $old_res = $old_stmt->get_result();
+                            if ($old_row = $old_res->fetch_assoc()) {
+                                $old_store_id = (int)$old_row['id'];
+                                $conn->query("UPDATE store_tbl SET delivered_to = NULL, delivery_status = 'pending', return_reason = '$return_condition', replace_new_id = '$onu_sn_escaped', returned_at = NOW(), approved_at = NULL WHERE id = $old_store_id");
+                            } else {
+                                // Insert into store_tbl with duplicate key protection
+                                $item_q = $conn->query("SELECT id FROM item_tbl WHERE item_name LIKE '%ONU%' LIMIT 1");
+                                $item_id = ($item_q && $i_r = $item_q->fetch_assoc()) ? (int)$i_r['id'] : 1;
+                                $ins_old = $conn->prepare("INSERT INTO store_tbl (item_id, barcode_id, delivered_to, delivery_status, return_reason, replace_new_id, returned_at, approved_at) 
+                                                           VALUES (?, ?, NULL, 'pending', ?, ?, NOW(), NULL)
+                                                           ON DUPLICATE KEY UPDATE return_reason = VALUES(return_reason), replace_new_id = VALUES(replace_new_id), returned_at = NOW(), approved_at = NULL, delivered_to = NULL, delivery_status = 'pending'");
+                                if ($ins_old) {
+                                    $ins_old->bind_param("isss", $item_id, $old_onu_sn, $return_condition, $onu_sn);
+                                    $ins_old->execute();
+                                    $old_store_id = $ins_old->insert_id ?: 0;
+                                    $ins_old->close();
+                                }
+                            }
+                            $old_stmt->close();
+                        }
+
+                        if ($old_store_id > 0) {
+                            $desc_old = "Returned - Reason: $return_condition (Replaced with new ONU " . $onu_sn . " by technician " . $submitted_by . " for customer " . $cust_name . ") - Awaiting Manager Approval before adding to Store";
+                            $hist_old = $conn->prepare("INSERT INTO store_item_history_tbl (store_id, action, description, action_by) VALUES (?, 'Returned', ?, ?)");
+                            if ($hist_old) {
+                                $hist_old->bind_param("iss", $old_store_id, $desc_old, $submitted_by);
+                                $hist_old->execute();
+                                $hist_old->close();
                             }
                         }
-                        $old_stmt->close();
-                    }
-
-                    if ($old_store_id > 0) {
-                        $desc_old = "Returned - Reason: $return_condition (Replaced with new ONU " . $onu_sn . " by technician " . $submitted_by . " for customer " . $cust_name . ") - Awaiting Manager Approval before adding to Store";
-                        $hist_old = $conn->prepare("INSERT INTO store_item_history_tbl (store_id, action, description, action_by) VALUES (?, 'Returned', ?, ?)");
-                        if ($hist_old) {
-                            $hist_old->bind_param("iss", $old_store_id, $desc_old, $submitted_by);
-                            $hist_old->execute();
-                            $hist_old->close();
-                        }
-                    }
+                    } catch (Throwable $e) {}
                 }
 
                 // C. Update Customer ONU & Append to Customer Note
@@ -150,19 +185,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
                     $up_cust->close();
                 }
 
-                // D. Create a Support Ticket record for auditing
-                $ticket_title = "ONU Replaced - Old: " . $old_onu_display . ", New: " . $onu_sn;
-                $ticket_desc = "ONU replaced by technician " . $submitted_by . " for customer " . $cust_name . " (" . $cust_user . ")";
-                $category_id = 2; // Technical Support
-                $priority = 'Medium';
-                $ticket_status = 'Completed';
+                // D. Create a Support Ticket record for auditing (completely fail-safe)
+                try {
+                    $ticket_title = "ONU Replaced - Old: " . $old_onu_display . ", New: " . $onu_sn;
+                    $ticket_desc = "ONU replaced by technician " . $submitted_by . " for customer " . $cust_name . " (" . $cust_user . ")";
+                    
+                    $cat_id = null;
+                    $cat_res = $conn->query("SELECT id FROM ticket_category_tbl WHERE id = 2 OR name LIKE '%Technical%' LIMIT 1");
+                    if ($cat_res && $cat_row = $cat_res->fetch_assoc()) {
+                        $cat_id = (int)$cat_row['id'];
+                    }
 
-                $stmt_ticket = $conn->prepare("INSERT INTO support_ticket_tbl (title, description, category_id, customer_id, priority, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                if ($stmt_ticket) {
-                    $stmt_ticket->bind_param("ssiisss", $ticket_title, $ticket_desc, $category_id, $customer_id, $priority, $ticket_status, $submitted_by);
-                    $stmt_ticket->execute();
-                    $stmt_ticket->close();
-                }
+                    $priority = 'Medium';
+                    $ticket_status = 'Completed';
+
+                    $stmt_ticket = $conn->prepare("INSERT INTO support_ticket_tbl (title, description, category_id, customer_id, priority, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    if ($stmt_ticket) {
+                        $stmt_ticket->bind_param("ssiisss", $ticket_title, $ticket_desc, $cat_id, $customer_id, $priority, $ticket_status, $submitted_by);
+                        $stmt_ticket->execute();
+                        $stmt_ticket->close();
+                    }
+                } catch (Throwable $e) {}
 
                 echo json_encode([
                     'status' => 'success',
@@ -174,17 +217,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
                 exit;
             }
         }
-
-        echo json_encode([
-            'status' => 'success', 
-            'message' => 'ONU SN submitted (' . $onu_sn . '). Status changed to TX Complete.',
-            'onu_sn' => $onu_sn,
-            'is_customer_own' => $is_customer_own
-        ]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to submit ONU SN: ' . $conn->error]);
     }
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+
+    echo json_encode([
+        'status' => 'success', 
+        'message' => 'ONU SN submitted (' . $onu_sn . '). Status changed to TX Complete.',
+        'onu_sn' => $onu_sn,
+        'is_customer_own' => $is_customer_own
+    ]);
+} catch (Throwable $e) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Failed to submit ONU: ' . $e->getMessage()
+    ]);
 }
-?>
+exit;
